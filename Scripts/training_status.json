@@ -1,0 +1,308 @@
+{
+    "AttitudeSatellite": {
+        "checkpoints": [
+            {
+                "steps": 179800,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-179800.onnx",
+                "reward": -143.65279801686606,
+                "creation_time": 1699969990.0302956,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-179800.pt"
+                ]
+            },
+            {
+                "steps": 359800,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-359800.onnx",
+                "reward": -153.25121355056763,
+                "creation_time": 1699970125.5055363,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-359800.pt"
+                ]
+            },
+            {
+                "steps": 539800,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-539800.onnx",
+                "reward": -121.49458174407482,
+                "creation_time": 1699970245.5132506,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-539800.pt"
+                ]
+            },
+            {
+                "steps": 719800,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-719800.onnx",
+                "reward": -74.50888571329415,
+                "creation_time": 1699970372.1805465,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-719800.pt"
+                ]
+            },
+            {
+                "steps": 899800,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-899800.onnx",
+                "reward": -76.16479810078938,
+                "creation_time": 1699970496.9672852,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-899800.pt"
+                ]
+            },
+            {
+                "steps": 1079800,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-1079800.onnx",
+                "reward": -43.77910838777369,
+                "creation_time": 1699970617.5553563,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-1079800.pt"
+                ]
+            },
+            {
+                "steps": 1259912,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-1259912.onnx",
+                "reward": -22.128034622470537,
+                "creation_time": 1699970747.6595914,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-1259912.pt"
+                ]
+            },
+            {
+                "steps": 1439939,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-1439939.onnx",
+                "reward": -20.52069945335388,
+                "creation_time": 1699970883.4865844,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-1439939.pt"
+                ]
+            },
+            {
+                "steps": 1619966,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-1619966.onnx",
+                "reward": -27.243517565727235,
+                "creation_time": 1699971021.5325174,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-1619966.pt"
+                ]
+            },
+            {
+                "steps": 1799949,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-1799949.onnx",
+                "reward": -9.221104979515076,
+                "creation_time": 1699971153.748085,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-1799949.pt"
+                ]
+            },
+            {
+                "steps": 1979878,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-1979878.onnx",
+                "reward": 9.852048516273499,
+                "creation_time": 1699971288.529641,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-1979878.pt"
+                ]
+            },
+            {
+                "steps": 2159913,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-2159913.onnx",
+                "reward": 3.7060134096725568,
+                "creation_time": 1699971422.1440537,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-2159913.pt"
+                ]
+            },
+            {
+                "steps": 2339870,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-2339870.onnx",
+                "reward": 2.6451542193841453,
+                "creation_time": 1699971560.3813243,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-2339870.pt"
+                ]
+            },
+            {
+                "steps": 2519867,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-2519867.onnx",
+                "reward": 5.525157384574413,
+                "creation_time": 1699971691.924299,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-2519867.pt"
+                ]
+            },
+            {
+                "steps": 2699890,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-2699890.onnx",
+                "reward": 3.7798116140459714,
+                "creation_time": 1699971824.507954,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-2699890.pt"
+                ]
+            },
+            {
+                "steps": 2879849,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-2879849.onnx",
+                "reward": 4.922839691241582,
+                "creation_time": 1699971954.9815085,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-2879849.pt"
+                ]
+            },
+            {
+                "steps": 3059910,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-3059910.onnx",
+                "reward": 6.8491327657699586,
+                "creation_time": 1699972086.4474196,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-3059910.pt"
+                ]
+            },
+            {
+                "steps": 3239851,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-3239851.onnx",
+                "reward": 7.473583028217157,
+                "creation_time": 1699972217.6493208,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-3239851.pt"
+                ]
+            },
+            {
+                "steps": 3419933,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-3419933.onnx",
+                "reward": 6.622819676182487,
+                "creation_time": 1699972355.3683848,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-3419933.pt"
+                ]
+            },
+            {
+                "steps": 3599985,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-3599985.onnx",
+                "reward": 6.94515373116046,
+                "creation_time": 1699972487.7930548,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-3599985.pt"
+                ]
+            },
+            {
+                "steps": 3779887,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-3779887.onnx",
+                "reward": 7.7474177388488785,
+                "creation_time": 1699972623.2233415,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-3779887.pt"
+                ]
+            },
+            {
+                "steps": 3959945,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-3959945.onnx",
+                "reward": 8.072725593588734,
+                "creation_time": 1699972754.9814794,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-3959945.pt"
+                ]
+            },
+            {
+                "steps": 4139851,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-4139851.onnx",
+                "reward": 8.73849198285123,
+                "creation_time": 1699972883.2943478,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-4139851.pt"
+                ]
+            },
+            {
+                "steps": 4319984,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-4319984.onnx",
+                "reward": 8.268695772182745,
+                "creation_time": 1699973013.8301058,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-4319984.pt"
+                ]
+            },
+            {
+                "steps": 4499991,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-4499991.onnx",
+                "reward": 8.914096838043582,
+                "creation_time": 1699973142.418541,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-4499991.pt"
+                ]
+            },
+            {
+                "steps": 4679908,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-4679908.onnx",
+                "reward": 8.614494349030283,
+                "creation_time": 1699973269.1975508,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-4679908.pt"
+                ]
+            },
+            {
+                "steps": 4859920,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-4859920.onnx",
+                "reward": 9.04212261507981,
+                "creation_time": 1699973402.519484,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-4859920.pt"
+                ]
+            },
+            {
+                "steps": 5039854,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-5039854.onnx",
+                "reward": 9.719468190493407,
+                "creation_time": 1699973541.8225284,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-5039854.pt"
+                ]
+            },
+            {
+                "steps": 5219905,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-5219905.onnx",
+                "reward": 9.149715437846524,
+                "creation_time": 1699973684.29724,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-5219905.pt"
+                ]
+            },
+            {
+                "steps": 5399976,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-5399976.onnx",
+                "reward": 9.608876027442792,
+                "creation_time": 1699973822.6112776,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-5399976.pt"
+                ]
+            },
+            {
+                "steps": 5579938,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-5579938.onnx",
+                "reward": 9.803593512191329,
+                "creation_time": 1699973956.266232,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-5579938.pt"
+                ]
+            },
+            {
+                "steps": 5589340,
+                "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-5589340.onnx",
+                "reward": null,
+                "creation_time": 1699973963.6358767,
+                "auxillary_file_paths": [
+                    "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-5589340.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 5589340,
+            "file_path": "results/AttitudeSatellite_test_01/AttitudeSatellite.onnx",
+            "reward": null,
+            "creation_time": 1699973963.6358767,
+            "auxillary_file_paths": [
+                "results/AttitudeSatellite_test_01/AttitudeSatellite/AttitudeSatellite-5589340.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.0.0",
+        "torch_version": "2.1.0+cu121"
+    }
+}

@@ -1,0 +1,38 @@
+{
+    "AttitudeSatellite": {
+        "checkpoints": [
+            {
+                "steps": 179800,
+                "file_path": "results/attitude_satellite_test_02/AttitudeSatellite/AttitudeSatellite-179800.onnx",
+                "reward": -162.92680275276916,
+                "creation_time": 1700143497.3018365,
+                "auxillary_file_paths": [
+                    "results/attitude_satellite_test_02/AttitudeSatellite/AttitudeSatellite-179800.pt"
+                ]
+            },
+            {
+                "steps": 209400,
+                "file_path": "results/attitude_satellite_test_02/AttitudeSatellite/AttitudeSatellite-209400.onnx",
+                "reward": -164.07220480475627,
+                "creation_time": 1700143551.9160345,
+                "auxillary_file_paths": [
+                    "results/attitude_satellite_test_02/AttitudeSatellite/AttitudeSatellite-209400.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 209400,
+            "file_path": "results/attitude_satellite_test_02/AttitudeSatellite.onnx",
+            "reward": -164.07220480475627,
+            "creation_time": 1700143551.9160345,
+            "auxillary_file_paths": [
+                "results/attitude_satellite_test_02/AttitudeSatellite/AttitudeSatellite-209400.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.0.0",
+        "torch_version": "2.1.0+cu121"
+    }
+}
