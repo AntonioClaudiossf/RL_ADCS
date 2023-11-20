@@ -32,7 +32,7 @@ As a result in the output layer of the neural network we have a vector (size 3) 
 
 ### Results :
 #### Training
-The ppo method was used for agent training, the result of the average reward during training can be observed below:
+The ppo method was used for agent training, the result of the mean cumulative reward during training can be observed below:
 <p align="center">
   <img src="/results/images/recompensa_vs_step_teste02.png" width=40% />
 </p>
