@@ -24,6 +24,11 @@ It was considered a simplified assembly with 3 reaction wheels aligned to the ma
 <p align="center">
 </p>
 
+### Agent
+
+To perform the training was used as input information the torque value that applied to the satelite (size 3), the desired quaternion (size 4), the current quaternion (size 4) of the satelite and the angular velocity (size 3) of the satelite in the three axes.
+
+As a result in the output layer of the neural network we have a vector of size three with values that are multiplied by a constate to convert to torque.
 
 ### Results :
 #### Training
