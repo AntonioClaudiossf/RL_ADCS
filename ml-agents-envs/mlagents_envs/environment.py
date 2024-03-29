@@ -152,7 +152,7 @@ class UnityEnvironment(BaseEnv):
         timeout_wait: int = 60,
         additional_args: Optional[List[str]] = None,
         side_channels: Optional[List[SideChannel]] = None,
-        log_folder: Optional[str] = "log",
+        log_folder: Optional[str] = None,
         num_areas: int = 1,
     ):
         """
@@ -285,8 +285,6 @@ class UnityEnvironment(BaseEnv):
         return args
 
     def _update_behavior_specs(self, output: UnityOutputProto) -> None:
-        # Récupère les specs : obs.shape, action_shape etc... depuis Unity et les stock 
-        # dans self._env_specs
         init_output = output.rl_initialization_output
         for brain_param in init_output.brain_parameters:
             # Each BrainParameter in the rl_initialization_output should have at least one AgentInfo
@@ -297,7 +295,6 @@ class UnityEnvironment(BaseEnv):
                 new_spec = behavior_spec_from_proto(brain_param, agent)
                 self._env_specs[brain_param.brain_name] = new_spec
                 logger.info(f"Connected new brain: {brain_param.brain_name}")
-
 
     def _update_state(self, output: UnityRLOutputProto) -> None:
         """
@@ -360,15 +357,25 @@ class UnityEnvironment(BaseEnv):
     def behavior_specs(self) -> MappingType[str, BehaviorSpec]:
         return BehaviorMapping(self._env_specs)
 
+    def _assert_behavior_exists(self, behavior_name: str) -> None:
+        if behavior_name not in self._env_specs:
+            raise UnityActionException(
+                f"The group {behavior_name} does not correspond to an existing "
+                f"agent group in the environment"
+            )
 
-    def set_actions(self, action: ActionTuple) -> None:
-        behavior_name = list(self._env_specs)[0]
+    def set_actions(self, behavior_name: BehaviorName, action: ActionTuple) -> None:
+        self._assert_behavior_exists(behavior_name)
+        if behavior_name not in self._env_state:
+            return
         action_spec = self._env_specs[behavior_name].action_spec
         num_agents = len(self._env_state[behavior_name][0])
         action = action_spec._validate_action(action, num_agents, behavior_name)
         self._env_actions[behavior_name] = action
 
-    def set_action_for_agent(self, behavior_name: BehaviorName, agent_id: AgentId, action: ActionTuple) -> None:
+    def set_action_for_agent(
+        self, behavior_name: BehaviorName, agent_id: AgentId, action: ActionTuple
+    ) -> None:
         self._assert_behavior_exists(behavior_name)
         if behavior_name not in self._env_state:
             return
@@ -392,8 +399,11 @@ class UnityEnvironment(BaseEnv):
         if action_spec.discrete_size > 0:
             self._env_actions[behavior_name].discrete[index] = action.discrete[0, :]
 
-    def get_steps(self) -> Tuple[DecisionSteps, TerminalSteps]:
-        return list(self._env_state.values())[0]
+    def get_steps(
+        self, behavior_name: BehaviorName
+    ) -> Tuple[DecisionSteps, TerminalSteps]:
+        self._assert_behavior_exists(behavior_name)
+        return self._env_state[behavior_name]
 
     def _poll_process(self) -> None:
         """
@@ -474,7 +484,9 @@ class UnityEnvironment(BaseEnv):
         )
         return self._wrap_unity_input(rl_in)
 
-    def _send_academy_parameters(self, init_parameters: UnityRLInitializationInputProto) -> UnityOutputProto:
+    def _send_academy_parameters(
+        self, init_parameters: UnityRLInitializationInputProto
+    ) -> UnityOutputProto:
         inputs = UnityInputProto()
         inputs.rl_initialization_input.CopyFrom(init_parameters)
         return self._communicator.initialize(inputs, self._poll_process)

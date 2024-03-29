@@ -19,8 +19,7 @@ def validate_existing_directories(
     """
 
     output_path_exists = os.path.isdir(output_path)
-    print(output_path)
-    print(output_path_exists)
+
     if output_path_exists:
         if not resume and not force:
             raise UnityTrainerException(

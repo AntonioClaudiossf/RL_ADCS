@@ -47,18 +47,20 @@ def check_and_structure(key: str, value: Any, class_type: type) -> Any:
 class TrainerType(Enum):
     PPO: str = "ppo"
     SAC: str = "sac"
+    POCA: str = "poca"
 
     def to_settings(self) -> type:
         _mapping = {
             TrainerType.PPO: PPOSettings,
             TrainerType.SAC: SACSettings,
+            TrainerType.POCA: POCASettings,
         }
         return _mapping[self]
 
 
 def check_hyperparam_schedules(val: Dict, trainer_type: TrainerType) -> Dict:
     # Check if beta and epsilon are set. If not, set to match learning rate schedule.
-    if trainer_type is TrainerType.PPO:
+    if trainer_type is TrainerType.PPO or trainer_type is TrainerType.POCA:
         if "beta_schedule" not in val.keys() and "learning_rate_schedule" in val.keys():
             val["beta_schedule"] = val["learning_rate_schedule"]
         if (
@@ -105,18 +107,63 @@ class ExportableSettings:
         return cattr.unstructure(self)
 
 
+class EncoderType(Enum):
+    FULLY_CONNECTED = "fully_connected"
+    MATCH3 = "match3"
+    SIMPLE = "simple"
+    NATURE_CNN = "nature_cnn"
+    RESNET = "resnet"
+
+
 class ScheduleType(Enum):
     CONSTANT = "constant"
     LINEAR = "linear"
+    # TODO add support for lesson based scheduling
+    # LESSON = "lesson"
+
+
+class ConditioningType(Enum):
+    HYPER = "hyper"
+    NONE = "none"
 
 
 @attr.s(auto_attribs=True)
 class NetworkSettings:
+    @attr.s
+    class MemorySettings:
+        sequence_length: int = attr.ib(default=64)
+        memory_size: int = attr.ib(default=128)
+
+        @memory_size.validator
+        def _check_valid_memory_size(self, attribute, value):
+            if value <= 0:
+                raise TrainerConfigError(
+                    "When using a recurrent network, memory size must be greater than 0."
+                )
+            elif value % 2 != 0:
+                raise TrainerConfigError(
+                    "When using a recurrent network, memory size must be divisible by 2."
+                )
+
     normalize: bool = False
     hidden_units: int = 128
     num_layers: int = 2
+    vis_encode_type: EncoderType = EncoderType.SIMPLE
+    memory: Optional[MemorySettings] = None
+    goal_conditioning_type: ConditioningType = ConditioningType.HYPER
     deterministic: bool = parser.get_default("deterministic")
 
+
+@attr.s(auto_attribs=True)
+class BehavioralCloningSettings:
+    demo_path: str
+    steps: int = 0
+    strength: float = 1.0
+    samples_per_update: int = 0
+    # Setting either of these to None will allow the Optimizer
+    # to decide these parameters, based on Trainer hyperparams
+    num_epoch: Optional[int] = None
+    batch_size: Optional[int] = None
 
 
 @attr.s(auto_attribs=True)
@@ -138,7 +185,6 @@ class PPOSettings(HyperparamSettings):
     epsilon_schedule: ScheduleType = ScheduleType.LINEAR
 
 
-
 @attr.s(auto_attribs=True)
 class SACSettings(HyperparamSettings):
     batch_size: int = 128
@@ -155,39 +201,23 @@ class SACSettings(HyperparamSettings):
         return self.steps_per_update
 
 
-@attr.s(auto_attribs=True)
-class TransferSettings:
-    use_bases : bool = False
-    fine_tune : bool = False
-    base_in_path: str = "dummy"
-    base_out_path: str = "dummy" 
-    task_obs_dim: int = attr.ib(default=0)
-    state_dim: int =  attr.ib(default=0)
-    latent_dim: int = attr.ib(default=0)
-    hidden_units: int = 256
+# POCA uses the same hyperparameters as PPO
+POCASettings = PPOSettings
 
-    @task_obs_dim.validator
-    def validate_task_obs_dim(self, attribute, value):
-        if value <= 0 and self.use_bases:
-            raise ValueError(" task_obs_dim should be > 0")
-
-    @state_dim.validator
-    def validate_state_dim(self, attribute, value):
-        if value <= 0 and self.use_bases:
-            raise ValueError(" state_dim should be > 0")
-
-    @latent_dim.validator
-    def validate_latent_dim(self, attribute, value):
-        if value <= 0 and self.use_bases:
-            raise ValueError(" latent_dim should be > 0")
 
 # INTRINSIC REWARD SIGNALS #############################################################
 class RewardSignalType(Enum):
     EXTRINSIC: str = "extrinsic"
+    GAIL: str = "gail"
+    CURIOSITY: str = "curiosity"
+    RND: str = "rnd"
 
     def to_settings(self) -> type:
         _mapping = {
             RewardSignalType.EXTRINSIC: RewardSignalSettings,
+            RewardSignalType.GAIL: GAILSettings,
+            RewardSignalType.CURIOSITY: CuriositySettings,
+            RewardSignalType.RND: RNDSettings,
         }
         return _mapping[self]
 
@@ -228,8 +258,388 @@ class RewardSignalSettings:
         return d_final
 
 
+@attr.s(auto_attribs=True)
+class GAILSettings(RewardSignalSettings):
+    learning_rate: float = 3e-4
+    encoding_size: Optional[int] = None
+    use_actions: bool = False
+    use_vail: bool = False
+    demo_path: str = attr.ib(kw_only=True)
+
+
+@attr.s(auto_attribs=True)
+class CuriositySettings(RewardSignalSettings):
+    learning_rate: float = 3e-4
+    encoding_size: Optional[int] = None
+
+
+@attr.s(auto_attribs=True)
+class RNDSettings(RewardSignalSettings):
+    learning_rate: float = 1e-4
+    encoding_size: Optional[int] = None
+
+
+# SAMPLERS #############################################################################
+class ParameterRandomizationType(Enum):
+    UNIFORM: str = "uniform"
+    GAUSSIAN: str = "gaussian"
+    MULTIRANGEUNIFORM: str = "multirangeuniform"
+    CONSTANT: str = "constant"
+
+    def to_settings(self) -> type:
+        _mapping = {
+            ParameterRandomizationType.UNIFORM: UniformSettings,
+            ParameterRandomizationType.GAUSSIAN: GaussianSettings,
+            ParameterRandomizationType.MULTIRANGEUNIFORM: MultiRangeUniformSettings,
+            ParameterRandomizationType.CONSTANT: ConstantSettings
+            # Constant type is handled if a float is provided instead of a config
+        }
+        return _mapping[self]
+
+
+@attr.s(auto_attribs=True)
+class ParameterRandomizationSettings(abc.ABC):
+    seed: int = parser.get_default("seed")
+
+    def __str__(self) -> str:
+        """
+        Helper method to output sampler stats to console.
+        """
+        raise TrainerConfigError(f"__str__ not implemented for type {self.__class__}.")
+
+    @staticmethod
+    def structure(
+        d: Union[Mapping, float], t: type
+    ) -> "ParameterRandomizationSettings":
+        """
+        Helper method to a ParameterRandomizationSettings class. Meant to be registered with
+        cattr.register_structure_hook() and called with cattr.structure(). This is needed to handle
+        the special Enum selection of ParameterRandomizationSettings classes.
+        """
+        if isinstance(d, (float, int)):
+            return ConstantSettings(value=d)
+        if not isinstance(d, Mapping):
+            raise TrainerConfigError(
+                f"Unsupported parameter randomization configuration {d}."
+            )
+        if "sampler_type" not in d:
+            raise TrainerConfigError(
+                f"Sampler configuration does not contain sampler_type : {d}."
+            )
+        if "sampler_parameters" not in d:
+            raise TrainerConfigError(
+                f"Sampler configuration does not contain sampler_parameters : {d}."
+            )
+        enum_key = ParameterRandomizationType(d["sampler_type"])
+        t = enum_key.to_settings()
+        return strict_to_cls(d["sampler_parameters"], t)
+
+    @staticmethod
+    def unstructure(d: "ParameterRandomizationSettings") -> Mapping:
+        """
+        Helper method to a ParameterRandomizationSettings class. Meant to be registered with
+        cattr.register_unstructure_hook() and called with cattr.unstructure().
+        """
+        _reversed_mapping = {
+            UniformSettings: ParameterRandomizationType.UNIFORM,
+            GaussianSettings: ParameterRandomizationType.GAUSSIAN,
+            MultiRangeUniformSettings: ParameterRandomizationType.MULTIRANGEUNIFORM,
+            ConstantSettings: ParameterRandomizationType.CONSTANT,
+        }
+        sampler_type: Optional[str] = None
+        for t, name in _reversed_mapping.items():
+            if isinstance(d, t):
+                sampler_type = name.value
+        sampler_parameters = attr.asdict(d)
+        return {"sampler_type": sampler_type, "sampler_parameters": sampler_parameters}
+
+    @abc.abstractmethod
+    def apply(self, key: str, env_channel: EnvironmentParametersChannel) -> None:
+        """
+        Helper method to send sampler settings over EnvironmentParametersChannel
+        Calls the appropriate sampler type set method.
+        :param key: environment parameter to be sampled
+        :param env_channel: The EnvironmentParametersChannel to communicate sampler settings to environment
+        """
+        pass
+
+
+@attr.s(auto_attribs=True)
+class ConstantSettings(ParameterRandomizationSettings):
+    value: float = 0.0
+
+    def __str__(self) -> str:
+        """
+        Helper method to output sampler stats to console.
+        """
+        return f"Float: value={self.value}"
+
+    def apply(self, key: str, env_channel: EnvironmentParametersChannel) -> None:
+        """
+        Helper method to send sampler settings over EnvironmentParametersChannel
+        Calls the constant sampler type set method.
+        :param key: environment parameter to be sampled
+        :param env_channel: The EnvironmentParametersChannel to communicate sampler settings to environment
+        """
+        env_channel.set_float_parameter(key, self.value)
+
+
+@attr.s(auto_attribs=True)
+class UniformSettings(ParameterRandomizationSettings):
+    min_value: float = attr.ib()
+    max_value: float = 1.0
+
+    def __str__(self) -> str:
+        """
+        Helper method to output sampler stats to console.
+        """
+        return f"Uniform sampler: min={self.min_value}, max={self.max_value}"
+
+    @min_value.default
+    def _min_value_default(self):
+        return 0.0
+
+    @min_value.validator
+    def _check_min_value(self, attribute, value):
+        if self.min_value > self.max_value:
+            raise TrainerConfigError(
+                "Minimum value is greater than maximum value in uniform sampler."
+            )
+
+    def apply(self, key: str, env_channel: EnvironmentParametersChannel) -> None:
+        """
+        Helper method to send sampler settings over EnvironmentParametersChannel
+        Calls the uniform sampler type set method.
+        :param key: environment parameter to be sampled
+        :param env_channel: The EnvironmentParametersChannel to communicate sampler settings to environment
+        """
+        env_channel.set_uniform_sampler_parameters(
+            key, self.min_value, self.max_value, self.seed
+        )
+
+
+@attr.s(auto_attribs=True)
+class GaussianSettings(ParameterRandomizationSettings):
+    mean: float = 1.0
+    st_dev: float = 1.0
+
+    def __str__(self) -> str:
+        """
+        Helper method to output sampler stats to console.
+        """
+        return f"Gaussian sampler: mean={self.mean}, stddev={self.st_dev}"
+
+    def apply(self, key: str, env_channel: EnvironmentParametersChannel) -> None:
+        """
+        Helper method to send sampler settings over EnvironmentParametersChannel
+        Calls the gaussian sampler type set method.
+        :param key: environment parameter to be sampled
+        :param env_channel: The EnvironmentParametersChannel to communicate sampler settings to environment
+        """
+        env_channel.set_gaussian_sampler_parameters(
+            key, self.mean, self.st_dev, self.seed
+        )
+
+
+@attr.s(auto_attribs=True)
+class MultiRangeUniformSettings(ParameterRandomizationSettings):
+    intervals: List[Tuple[float, float]] = attr.ib()
+
+    def __str__(self) -> str:
+        """
+        Helper method to output sampler stats to console.
+        """
+        return f"MultiRangeUniform sampler: intervals={self.intervals}"
+
+    @intervals.default
+    def _intervals_default(self):
+        return [[0.0, 1.0]]
+
+    @intervals.validator
+    def _check_intervals(self, attribute, value):
+        for interval in self.intervals:
+            if len(interval) != 2:
+                raise TrainerConfigError(
+                    f"The sampling interval {interval} must contain exactly two values."
+                )
+            min_value, max_value = interval
+            if min_value > max_value:
+                raise TrainerConfigError(
+                    f"Minimum value is greater than maximum value in interval {interval}."
+                )
+
+    def apply(self, key: str, env_channel: EnvironmentParametersChannel) -> None:
+        """
+        Helper method to send sampler settings over EnvironmentParametersChannel
+        Calls the multirangeuniform sampler type set method.
+        :param key: environment parameter to be sampled
+        :param env_channel: The EnvironmentParametersChannel to communicate sampler settings to environment
+        """
+        env_channel.set_multirangeuniform_sampler_parameters(
+            key, self.intervals, self.seed
+        )
+
+
+# ENVIRONMENT PARAMETERS ###############################################################
+@attr.s(auto_attribs=True)
+class CompletionCriteriaSettings:
+    """
+    CompletionCriteriaSettings contains the information needed to figure out if the next
+    lesson must start.
+    """
+
+    class MeasureType(Enum):
+        PROGRESS: str = "progress"
+        REWARD: str = "reward"
+
+    behavior: str
+    measure: MeasureType = attr.ib(default=MeasureType.REWARD)
+    min_lesson_length: int = 0
+    signal_smoothing: bool = True
+    threshold: float = attr.ib(default=0.0)
+    require_reset: bool = False
+
+    @threshold.validator
+    def _check_threshold_value(self, attribute, value):
+        """
+        Verify that the threshold has a value between 0 and 1 when the measure is
+        PROGRESS
+        """
+        if self.measure == self.MeasureType.PROGRESS:
+            if self.threshold > 1.0:
+                raise TrainerConfigError(
+                    "Threshold for next lesson cannot be greater than 1 when the measure is progress."
+                )
+            if self.threshold < 0.0:
+                raise TrainerConfigError(
+                    "Threshold for next lesson cannot be negative when the measure is progress."
+                )
+
+    def need_increment(
+        self, progress: float, reward_buffer: List[float], smoothing: float
+    ) -> Tuple[bool, float]:
+        """
+        Given measures, this method returns a boolean indicating if the lesson
+        needs to change now, and a float corresponding to the new smoothed value.
+        """
+        # Is the min number of episodes reached
+        if len(reward_buffer) < self.min_lesson_length:
+            return False, smoothing
+        if self.measure == CompletionCriteriaSettings.MeasureType.PROGRESS:
+            if progress > self.threshold:
+                return True, smoothing
+        if self.measure == CompletionCriteriaSettings.MeasureType.REWARD:
+            if len(reward_buffer) < 1:
+                return False, smoothing
+            measure = np.mean(reward_buffer)
+            if math.isnan(measure):
+                return False, smoothing
+            if self.signal_smoothing:
+                measure = 0.25 * smoothing + 0.75 * measure
+                smoothing = measure
+            if measure > self.threshold:
+                return True, smoothing
+        return False, smoothing
+
+
+@attr.s(auto_attribs=True)
+class Lesson:
+    """
+    Gathers the data of one lesson for one environment parameter including its name,
+    the condition that must be fullfiled for the lesson to be completed and a sampler
+    for the environment parameter. If the completion_criteria is None, then this is
+    the last lesson in the curriculum.
+    """
+
+    value: ParameterRandomizationSettings
+    name: str
+    completion_criteria: Optional[CompletionCriteriaSettings] = attr.ib(default=None)
+
+
+@attr.s(auto_attribs=True)
+class EnvironmentParameterSettings:
+    """
+    EnvironmentParameterSettings is an ordered list of lessons for one environment
+    parameter.
+    """
+
+    curriculum: List[Lesson]
+
+    @staticmethod
+    def _check_lesson_chain(lessons, parameter_name):
+        """
+        Ensures that when using curriculum, all non-terminal lessons have a valid
+        CompletionCriteria, and that the terminal lesson does not contain a CompletionCriteria.
+        """
+        num_lessons = len(lessons)
+        for index, lesson in enumerate(lessons):
+            if index < num_lessons - 1 and lesson.completion_criteria is None:
+                raise TrainerConfigError(
+                    f"A non-terminal lesson does not have a completion_criteria for {parameter_name}."
+                )
+            if index == num_lessons - 1 and lesson.completion_criteria is not None:
+                warnings.warn(
+                    f"Your final lesson definition contains completion_criteria for {parameter_name}."
+                    f"It will be ignored.",
+                    TrainerConfigWarning,
+                )
+
+    @staticmethod
+    def structure(d: Mapping, t: type) -> Dict[str, "EnvironmentParameterSettings"]:
+        """
+        Helper method to structure a Dict of EnvironmentParameterSettings class. Meant
+        to be registered with cattr.register_structure_hook() and called with
+        cattr.structure().
+        """
+        if not isinstance(d, Mapping):
+            raise TrainerConfigError(
+                f"Unsupported parameter environment parameter settings {d}."
+            )
+        d_final: Dict[str, EnvironmentParameterSettings] = {}
+        for environment_parameter, environment_parameter_config in d.items():
+            if (
+                isinstance(environment_parameter_config, Mapping)
+                and "curriculum" in environment_parameter_config
+            ):
+                d_final[environment_parameter] = strict_to_cls(
+                    environment_parameter_config, EnvironmentParameterSettings
+                )
+                EnvironmentParameterSettings._check_lesson_chain(
+                    d_final[environment_parameter].curriculum, environment_parameter
+                )
+            else:
+                sampler = ParameterRandomizationSettings.structure(
+                    environment_parameter_config, ParameterRandomizationSettings
+                )
+                d_final[environment_parameter] = EnvironmentParameterSettings(
+                    curriculum=[
+                        Lesson(
+                            completion_criteria=None,
+                            value=sampler,
+                            name=environment_parameter,
+                        )
+                    ]
+                )
+        return d_final
+
 
 # TRAINERS #############################################################################
+@attr.s(auto_attribs=True)
+class SelfPlaySettings:
+    save_steps: int = 20000
+    team_change: int = attr.ib()
+
+    @team_change.default
+    def _team_change_default(self):
+        # Assign team_change to about 4x save_steps
+        return self.save_steps * 5
+
+    swap_steps: int = 2000
+    window: int = 10
+    play_against_latest_model_ratio: float = 0.5
+    initial_elo: float = 1200.0
+
+
 @attr.s(auto_attribs=True)
 class TrainerSettings(ExportableSettings):
     default_override: ClassVar[Optional["TrainerSettings"]] = None
@@ -241,7 +651,6 @@ class TrainerSettings(ExportableSettings):
         return self.trainer_type.to_settings()()
 
     network_settings: NetworkSettings = attr.ib(factory=NetworkSettings)
-    transfer_settings: TransferSettings = attr.ib(factory=TransferSettings)
     reward_signals: Dict[RewardSignalType, RewardSignalSettings] = attr.ib(
         factory=lambda: {RewardSignalType.EXTRINSIC: RewardSignalSettings()}
     )
@@ -251,9 +660,24 @@ class TrainerSettings(ExportableSettings):
     max_steps: int = 500000
     time_horizon: int = 64
     summary_freq: int = 50000
+    threaded: bool = False
+    self_play: Optional[SelfPlaySettings] = None
+    behavioral_cloning: Optional[BehavioralCloningSettings] = None
+
     cattr.register_structure_hook(
         Dict[RewardSignalType, RewardSignalSettings], RewardSignalSettings.structure
     )
+
+    @network_settings.validator
+    def _check_batch_size_seq_length(self, attribute, value):
+        if self.network_settings.memory is not None:
+            if (
+                self.network_settings.memory.sequence_length
+                > self.hyperparameters.batch_size
+            ):
+                raise TrainerConfigError(
+                    "When using memory, sequence length must be less than or equal to batch size. "
+                )
 
     @staticmethod
     def dict_to_trainerdict(d: Dict, t: type) -> "TrainerSettings.DefaultTrainerDict":
@@ -436,11 +860,13 @@ class TorchSettings:
 
 @attr.s(auto_attribs=True)
 class RunOptions(ExportableSettings):
-
     default_settings: Optional[TrainerSettings] = None
-    behaviors: TrainerSettings.DefaultTrainerDict = attr.ib(factory=TrainerSettings.DefaultTrainerDict)
+    behaviors: TrainerSettings.DefaultTrainerDict = attr.ib(
+        factory=TrainerSettings.DefaultTrainerDict
+    )
     env_settings: EnvironmentSettings = attr.ib(factory=EnvironmentSettings)
     engine_settings: EngineSettings = attr.ib(factory=EngineSettings)
+    environment_parameters: Optional[Dict[str, EnvironmentParameterSettings]] = None
     checkpoint_settings: CheckpointSettings = attr.ib(factory=CheckpointSettings)
     torch_settings: TorchSettings = attr.ib(factory=TorchSettings)
 
@@ -452,6 +878,16 @@ class RunOptions(ExportableSettings):
     cattr.register_structure_hook(EnvironmentSettings, strict_to_cls)
     cattr.register_structure_hook(EngineSettings, strict_to_cls)
     cattr.register_structure_hook(CheckpointSettings, strict_to_cls)
+    cattr.register_structure_hook(
+        Dict[str, EnvironmentParameterSettings], EnvironmentParameterSettings.structure
+    )
+    cattr.register_structure_hook(Lesson, strict_to_cls)
+    cattr.register_structure_hook(
+        ParameterRandomizationSettings, ParameterRandomizationSettings.structure
+    )
+    cattr.register_unstructure_hook(
+        ParameterRandomizationSettings, ParameterRandomizationSettings.unstructure
+    )
     cattr.register_structure_hook(TrainerSettings, TrainerSettings.structure)
     cattr.register_structure_hook(
         TrainerSettings.DefaultTrainerDict, TrainerSettings.dict_to_trainerdict
@@ -489,42 +925,16 @@ class RunOptions(ExportableSettings):
             # Detect bad config options
             if key not in attr.fields_dict(RunOptions):
                 raise TrainerConfigError(
-                    "The option {} was specified in your YAML file, but is invalid.".format(key)
+                    "The option {} was specified in your YAML file, but is invalid.".format(
+                        key
+                    )
                 )
-
 
         # Override with CLI args
         # Keep deprecated --load working, TODO: remove
         argparse_args["resume"] = argparse_args["resume"] or argparse_args["load_model"]
 
         for key, val in argparse_args.items():
-            if key == "ckpt_name":
-                if val is not None :
-                    configured_dict["behaviors"]["Behavior"]["init_path"] = val
-                    continue
-            if key == "initialize_from":
-                if val is not None :
-                    configured_dict["behaviors"]["Behavior"]["transfer_settings"]["fine_tune"] = True
-                else :
-                    configured_dict["behaviors"]["Behavior"]["transfer_settings"]["fine_tune"] = False
-
-            if key == "unn":
-                if val :
-                    configured_dict["behaviors"]["Behavior"]["transfer_settings"]["use_bases"] = True
-                    continue
-                    print()
-                    print("================================")
-                    print("=*=*= TRAINING A UNN AGENT =*=*=")
-                    print("================================")
-                    print()
-                else :
-                    configured_dict["behaviors"]["Behavior"]["transfer_settings"]["use_bases"] = False
-                    continue
-                    print()
-                    print("========================================")
-                    print("=*=*= TRAINING A REGULAR PPO AGENT =*=*=")
-                    print("========================================")
-                    print()
             if key in DetectDefault.non_default_args:
                 if key in attr.fields_dict(CheckpointSettings):
                     configured_dict["checkpoint_settings"][key] = val
@@ -536,6 +946,7 @@ class RunOptions(ExportableSettings):
                     configured_dict["torch_settings"][key] = val
                 else:  # Base options
                     configured_dict[key] = val
+
         final_runoptions = RunOptions.from_dict(configured_dict)
         final_runoptions.checkpoint_settings.prioritize_resume_init()
         # Need check to bypass type checking but keep structure on dict working
@@ -551,6 +962,7 @@ class RunOptions(ExportableSettings):
                 final_runoptions.behaviors[
                     behaviour
                 ].network_settings.deterministic = argparse_args["deterministic"]
+
         return final_runoptions
 
     @staticmethod

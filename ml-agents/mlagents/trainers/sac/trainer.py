@@ -34,6 +34,7 @@ class SACTrainer(RLTrainer):
 
     def __init__(
         self,
+        behavior_name: str,
         reward_buff_cap: int,
         trainer_settings: TrainerSettings,
         training: bool,
@@ -52,6 +53,7 @@ class SACTrainer(RLTrainer):
         :param artifact_path: The directory within which to store artifacts from this trainer.
         """
         super().__init__(
+            behavior_name,
             trainer_settings,
             training,
             load,

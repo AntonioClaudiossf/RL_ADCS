@@ -68,13 +68,6 @@ def _create_parser() -> argparse.ArgumentParser:
         "trainer_config_path", action=StoreConfigFile, nargs="?", default=None
     )
     argparser.add_argument(
-        "--unn",
-        default=False,
-        dest="unn",
-        action=DetectDefaultStoreTrue,
-        help="Whether to train a UNN model or a RL model ",
-    )
-    argparser.add_argument(
         "--env",
         default=None,
         dest="env_path",
@@ -136,12 +129,6 @@ def _create_parser() -> argparse.ArgumentParser:
         action=DetectDefault,
     )
     argparser.add_argument(
-        "--ckpt-name",
-        default=None,
-        help="Checkpoint file name",
-        action=DetectDefault,
-    )
-    argparser.add_argument(
         "--seed",
         default=-1,
         type=int,
@@ -176,9 +163,10 @@ def _create_parser() -> argparse.ArgumentParser:
     )
     argparser.add_argument(
         "--num-envs",
-        default=7,
+        default=1,
         type=int,
-        help="The number of concurrent Unity environment instances to collect experiences from when training",
+        help="The number of concurrent Unity environment instances to collect experiences "
+        "from when training",
         action=DetectDefault,
     )
 
@@ -248,7 +236,7 @@ def _create_parser() -> argparse.ArgumentParser:
     eng_conf = argparser.add_argument_group(title="Engine Configuration")
     eng_conf.add_argument(
         "--width",
-        default=600,
+        default=84,
         type=int,
         help="The width of the executable window of the environment(s) in pixels "
         "(ignored for editor training).",
@@ -256,7 +244,7 @@ def _create_parser() -> argparse.ArgumentParser:
     )
     eng_conf.add_argument(
         "--height",
-        default=600,
+        default=84,
         type=int,
         help="The height of the executable window of the environment(s) in pixels "
         "(ignored for editor training)",
@@ -296,7 +284,7 @@ def _create_parser() -> argparse.ArgumentParser:
     )
     eng_conf.add_argument(
         "--no-graphics",
-        default=True,
+        default=False,
         action=DetectDefaultStoreTrue,
         help="Whether to run the Unity executable in no-graphics mode (i.e. without initializing "
         "the graphics driver. Use this only if your agents don't use visual observations.",

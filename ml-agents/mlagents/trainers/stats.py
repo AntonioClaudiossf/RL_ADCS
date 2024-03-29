@@ -101,7 +101,9 @@ class StatsWriter(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def write_stats(self, category: str, values: Dict[str, StatsSummary], step: int, model_path : str) -> None:
+    def write_stats(
+        self, category: str, values: Dict[str, StatsSummary], step: int
+    ) -> None:
         """
         Callback to record training information
         :param category: Category of the statistics. Usually this is the behavior name.
@@ -139,7 +141,7 @@ class GaugeWriter(StatsWriter):
         return s.replace("/", ".").replace(" ", "")
 
     def write_stats(
-        self, category: str, values: Dict[str, StatsSummary], step: int, model_path : str
+        self, category: str, values: Dict[str, StatsSummary], step: int
     ) -> None:
         for val, stats_summary in values.items():
             set_gauge(
@@ -159,10 +161,10 @@ class ConsoleWriter(StatsWriter):
         self.self_play = False
         self.self_play_team = -1
         self.rank = get_rank()
-        self.rwd_mean_history = []
-        self.rwd_std_history = []
 
-    def write_stats(self, category: str, values: Dict[str, StatsSummary], step: int, model_path : str) -> None:
+    def write_stats(
+        self, category: str, values: Dict[str, StatsSummary], step: int
+    ) -> None:
         is_training = "Not Training"
         if "Is Training" in values:
             stats_summary = values["Is Training"]
@@ -179,13 +181,11 @@ class ConsoleWriter(StatsWriter):
                 log_info.append(f"Rank: {self.rank}")
 
             log_info.append(f"Mean Reward: {stats_summary.mean:0.3f}")
-            self.rwd_mean_history.append(stats_summary.mean)
             if "Environment/Group Cumulative Reward" in values:
                 group_stats_summary = values["Environment/Group Cumulative Reward"]
                 log_info.append(f"Mean Group Reward: {group_stats_summary.mean:0.3f}")
             else:
                 log_info.append(f"Std of Reward: {stats_summary.std:0.3f}")
-                self.rwd_std_history.append(stats_summary.std)
             log_info.append(is_training)
 
             if self.self_play and "Self-play/ELO" in values:
@@ -233,7 +233,7 @@ class TensorboardWriter(StatsWriter):
         self.hidden_keys: List[str] = hidden_keys if hidden_keys is not None else []
 
     def write_stats(
-        self, category: str, values: Dict[str, StatsSummary], step: int, model_path : str
+        self, category: str, values: Dict[str, StatsSummary], step: int
     ) -> None:
         self._maybe_create_summary_writer(category)
         for key, value in values.items():
@@ -294,7 +294,7 @@ class StatsReporter:
         lambda: defaultdict(lambda: StatsAggregationMethod.AVERAGE)
     )
 
-    def __init__(self, category: str, model_path : str):
+    def __init__(self, category: str):
         """
         Generic StatsReporter. A category is the broadest type of storage (would
         correspond the run name and trainer name, e.g. 3DBalltest_3DBall. A key is the
@@ -302,7 +302,6 @@ class StatsReporter:
         attached to this stat.
         """
         self.category: str = category
-        self.model_path = model_path
 
     @staticmethod
     def add_writer(writer: StatsWriter) -> None:
@@ -374,7 +373,7 @@ class StatsReporter:
                     stat_summary = self.get_stats_summaries(key)
                     values[key] = stat_summary
             for writer in StatsReporter.writers:
-                writer.write_stats(self.category, values, step,self.model_path)
+                writer.write_stats(self.category, values, step)
             del StatsReporter.stats_dict[self.category]
 
     def get_stats_summaries(self, key: str) -> StatsSummary:

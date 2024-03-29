@@ -3,7 +3,6 @@ from typing import Dict, NamedTuple, List, Any, Optional, Callable, Set
 import cloudpickle
 import enum
 import time
-import pprint
 
 from mlagents_envs.environment import UnityEnvironment
 from mlagents_envs.exception import (
@@ -26,7 +25,7 @@ from mlagents_envs.timers import (
     reset_timers,
     get_timer_root,
 )
-from mlagents.trainers.settings import  RunOptions
+from mlagents.trainers.settings import ParameterRandomizationSettings, RunOptions
 from mlagents.trainers.action_info import ActionInfo
 from mlagents_envs.side_channel.environment_parameters_channel import (
     EnvironmentParametersChannel,
@@ -39,13 +38,15 @@ from mlagents_envs.side_channel.stats_side_channel import (
     EnvironmentStats,
     StatsSideChannel,
 )
-
+from mlagents.trainers.training_analytics_side_channel import (
+    TrainingAnalyticsSideChannel,
+)
 from mlagents_envs.side_channel.side_channel import SideChannel
 
 
 logger = logging_util.get_logger(__name__)
 WORKER_SHUTDOWN_TIMEOUT_S = 10
-pp = pprint.PrettyPrinter(indent=4)
+
 
 class EnvironmentCommand(enum.Enum):
     STEP = 1
@@ -76,12 +77,12 @@ class StepResponse(NamedTuple):
 
 
 class UnityEnvWorker:
-    def __init__(self, worker_id: int, conn: Connection, process : Process):
+    def __init__(self, process: Process, worker_id: int, conn: Connection):
         self.process = process
         self.worker_id = worker_id
         self.conn = conn
         self.previous_step: EnvironmentStep = EnvironmentStep.empty(worker_id)
-        self.previous_all_action_info: ActionInfo = None
+        self.previous_all_action_info: Dict[str, ActionInfo] = {}
         self.waiting = False
         self.closed = False
 
@@ -120,7 +121,6 @@ def worker(
     run_options: RunOptions,
     log_level: int = logging_util.INFO,
 ) -> None:
-
     env_factory: Callable[
         [int, List[SideChannel]], UnityEnvironment
     ] = cloudpickle.loads(pickled_env_factory)
@@ -138,6 +138,9 @@ def worker(
     engine_configuration_channel.set_configuration(engine_config)
 
     stats_channel = StatsSideChannel()
+    training_analytics_channel: Optional[TrainingAnalyticsSideChannel] = None
+    if worker_id == 0:
+        training_analytics_channel = TrainingAnalyticsSideChannel()
     env: UnityEnvironment = None
     # Set log level. On some platforms, the logger isn't common with the
     # main process, so we need to set it again.
@@ -147,19 +150,35 @@ def worker(
         parent_conn.send(EnvironmentResponse(cmd_name, worker_id, payload))
 
     def _generate_all_results() -> AllStepResult:
-        return env.get_steps()
+        all_step_result: AllStepResult = {}
+        for brain_name in env.behavior_specs:
+            all_step_result[brain_name] = env.get_steps(brain_name)
+        return all_step_result
 
     try:
         side_channels = [env_parameters, engine_configuration_channel, stats_channel]
-        env = env_factory(worker_id, side_channels) # Crée un UnityEnv à partir de la env_factory
+        if training_analytics_channel is not None:
+            side_channels.append(training_analytics_channel)
+
+        env = env_factory(worker_id, side_channels)
+        if (
+            not env.academy_capabilities
+            or not env.academy_capabilities.trainingAnalytics
+        ):
+            # Make sure we don't try to send training analytics if the environment doesn't know how to process
+            # them. This wouldn't be catastrophic, but would result in unknown SideChannel UUIDs being used.
+            training_analytics_channel = None
+        if training_analytics_channel:
+            training_analytics_channel.environment_initialized(run_options)
 
         while True:
             req: EnvironmentRequest = parent_conn.recv()
             if req.cmd == EnvironmentCommand.STEP:
-                action_info = req.payload  # Payload contient l'action à appliquer à l'env
-                env.set_actions(action_info.env_action)  # retirer le "behavior"
-
-                env.step()  # Step the environment according to actions set in "env.set_actions()"
+                all_action_info = req.payload
+                for brain_name, action_info in all_action_info.items():
+                    if len(action_info.agent_ids) > 0:
+                        env.set_actions(brain_name, action_info.env_action)
+                env.step()
                 all_step_result = _generate_all_results()
                 # The timers in this process are independent from all the processes and the "main" process
                 # So after we send back the root timer, we can safely clear them.
@@ -178,11 +197,19 @@ def worker(
                 reset_timers()
             elif req.cmd == EnvironmentCommand.BEHAVIOR_SPECS:
                 _send_response(EnvironmentCommand.BEHAVIOR_SPECS, env.behavior_specs)
+            elif req.cmd == EnvironmentCommand.ENVIRONMENT_PARAMETERS:
+                for k, v in req.payload.items():
+                    if isinstance(v, ParameterRandomizationSettings):
+                        v.apply(k, env_parameters)
+            elif req.cmd == EnvironmentCommand.TRAINING_STARTED:
+                behavior_name, trainer_config = req.payload
+                if training_analytics_channel:
+                    training_analytics_channel.training_started(
+                        behavior_name, trainer_config
+                    )
             elif req.cmd == EnvironmentCommand.RESET:
-                # c'est le env.reset qui génère le behavior
                 env.reset()
                 all_step_result = _generate_all_results()
-                print(all_step_result)
                 _send_response(EnvironmentCommand.RESET, all_step_result)
             elif req.cmd == EnvironmentCommand.CLOSE:
                 break
@@ -217,13 +244,6 @@ def worker(
 
 
 class SubprocessEnvManager(EnvManager):
-    """ Démarrre un nombre de process égale au nombre n_env. Ces process utilisent Pipe() qui permet
-        la communication duplex enter parent et child process. Les process ont pour target la fonction
-        worker(). La fonction qui fait ça : create_worker() renvoie un UnityEnvWorker() qui peut rcv 
-        et send des EnvRequest.
-
-        Cette classe sert avant tout à gérer les différents process pour step, reset, exit etc...
-    """
     def __init__(
         self,
         env_factory: Callable[[int, List[SideChannel]], BaseEnv],
@@ -237,15 +257,17 @@ class SubprocessEnvManager(EnvManager):
         self.env_factory = env_factory
         self.run_options = run_options
         self.env_parameters: Optional[Dict] = None
-
         # Each worker is correlated with a list of times they restarted within the last time period.
         self.recent_restart_timestamps: List[List[datetime.datetime]] = [
             [] for _ in range(n_env)
         ]
         self.restart_counts: List[int] = [0] * n_env
-
         for worker_idx in range(n_env):
-            self.env_workers.append(self.create_worker(worker_idx, self.step_queue, env_factory, run_options))
+            self.env_workers.append(
+                self.create_worker(
+                    worker_idx, self.step_queue, env_factory, run_options
+                )
+            )
             self.workers_alive += 1
 
     @staticmethod
@@ -255,7 +277,6 @@ class SubprocessEnvManager(EnvManager):
         env_factory: Callable[[int, List[SideChannel]], BaseEnv],
         run_options: RunOptions,
     ) -> UnityEnvWorker:
-
         parent_conn, child_conn = Pipe()
 
         # Need to use cloudpickle for the env factory function since function objects aren't picklable
@@ -273,16 +294,13 @@ class SubprocessEnvManager(EnvManager):
             ),
         )
         child_process.start()
-        return UnityEnvWorker(worker_id, parent_conn,child_process)
+        return UnityEnvWorker(child_process, worker_id, parent_conn)
 
     def _queue_steps(self) -> None:
         for env_worker in self.env_workers:
             if not env_worker.waiting:
-                # get_action based on DecisionStep from env_workers
-                env_action_info = self._take_step(env_worker.previous_step) 
-                # sauvegarde les actions de la step precédante ?
+                env_action_info = self._take_step(env_worker.previous_step)
                 env_worker.previous_all_action_info = env_action_info
-                # Envoie l'info aux workers de step le UnityEnv
                 env_worker.send(EnvironmentCommand.STEP, env_action_info)
                 env_worker.waiting = True
 
@@ -394,11 +412,8 @@ class SubprocessEnvManager(EnvManager):
         # Poll the step queue for completed steps from environment workers until we retrieve
         # 1 or more, which we will then return as StepInfos
         while len(worker_steps) < 1:
-            # Attend que les worker aient step l'env => au moins une réponse ?
             try:
                 while True:
-                    # puis récupère les EnvironmentStep qui sont dans la réponse
-                    # jusqu'à ce que step_queue soit vide
                     step: EnvironmentResponse = self.step_queue.get_nowait()
                     if step.cmd == EnvironmentCommand.ENV_EXITED:
                         # If even one env exits try to restart all envs that failed.
@@ -416,25 +431,51 @@ class SubprocessEnvManager(EnvManager):
         step_infos = self._postprocess_steps(worker_steps)
         return step_infos
 
-    def _reset_env(self) -> List[EnvironmentStep]:
+    def _reset_env(self, config: Optional[Dict] = None) -> List[EnvironmentStep]:
         while any(ew.waiting for ew in self.env_workers):
             if not self.step_queue.empty():
                 step = self.step_queue.get_nowait()
                 self.env_workers[step.worker_id].waiting = False
-
+        # Send config to environment
+        self.set_env_parameters(config)
         # First enqueue reset commands for all workers so that they reset in parallel
         for ew in self.env_workers:
-            ew.send(EnvironmentCommand.RESET)
+            ew.send(EnvironmentCommand.RESET, config)
         # Next (synchronously) collect the reset observations from each worker in sequence
         for ew in self.env_workers:
             ew.previous_step = EnvironmentStep(ew.recv().payload, ew.worker_id, {}, {})
         return list(map(lambda ew: ew.previous_step, self.env_workers))
 
+    def set_env_parameters(self, config: Dict = None) -> None:
+        """
+        Sends environment parameter settings to C# via the
+        EnvironmentParametersSidehannel for each worker.
+        :param config: Dict of environment parameter keys and values
+        """
+        self.env_parameters = config
+        for ew in self.env_workers:
+            ew.send(EnvironmentCommand.ENVIRONMENT_PARAMETERS, config)
+
+    def on_training_started(
+        self, behavior_name: str, trainer_settings: TrainerSettings
+    ) -> None:
+        """
+        Handle traing starting for a new behavior type. Generally nothing is necessary here.
+        :param behavior_name:
+        :param trainer_settings:
+        :return:
+        """
+        for ew in self.env_workers:
+            ew.send(
+                EnvironmentCommand.TRAINING_STARTED, (behavior_name, trainer_settings)
+            )
 
     @property
-    def training_behaviors(self) -> BehaviorSpec:
-        self.env_workers[0].send(EnvironmentCommand.BEHAVIOR_SPECS)
-        result = list(self.env_workers[0].recv().payload._dict.values())[0]
+    def training_behaviors(self) -> Dict[BehaviorName, BehaviorSpec]:
+        result: Dict[BehaviorName, BehaviorSpec] = {}
+        for worker in self.env_workers:
+            worker.send(EnvironmentCommand.BEHAVIOR_SPECS)
+            result.update(worker.recv().payload)
         return result
 
     def close(self) -> None:
@@ -465,8 +506,9 @@ class SubprocessEnvManager(EnvManager):
                     )
         self.step_queue.join_thread()
 
-    def _postprocess_steps(self, env_steps: List[EnvironmentResponse]) -> List[EnvironmentStep]:
-        # Converti les réponses en EnvironmentStep
+    def _postprocess_steps(
+        self, env_steps: List[EnvironmentResponse]
+    ) -> List[EnvironmentStep]:
         step_infos = []
         timer_nodes = []
         for step in env_steps:
@@ -494,7 +536,11 @@ class SubprocessEnvManager(EnvManager):
         return step_infos
 
     @timed
-    def _take_step(self, last_step: EnvironmentStep) -> ActionInfo:
-        decision_step,_ = last_step.current_all_step_result
-        return self.policy.get_action(decision_step, last_step.worker_id)
-
+    def _take_step(self, last_step: EnvironmentStep) -> Dict[BehaviorName, ActionInfo]:
+        all_action_info: Dict[str, ActionInfo] = {}
+        for brain_name, step_tuple in last_step.current_all_step_result.items():
+            if brain_name in self.policies:
+                all_action_info[brain_name] = self.policies[brain_name].get_action(
+                    step_tuple[0], last_step.worker_id
+                )
+        return all_action_info

@@ -2,22 +2,11 @@ import numpy as np
 import gym
 from gym import spaces
 import torch
-
-
 from mlagents_envs.base_env import DecisionSteps, TerminalSteps
 from mlagents_envs.base_env import ActionTuple,BaseEnv
 from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
 from mlagents_envs.environment import UnityEnvironment
 
-# rajouter un booleen pour savoir quelle bases on utilise
-
-# Tester avec regularizion term pour pénaliser l'UNN si s'éloigne de 1 et 1.5 de clipping
-
-# remplacer dim task obs par task_obs = obs[self.action_size:]
-
-# TODO : 
-#
-#
 
 def make_unity_env(env_path,worker_id,no_graphics = True,time_scale = 20.0):
 	channel = EngineConfigurationChannel()
@@ -36,7 +25,7 @@ class UnityGymEnvironment(gym.Env):
 	def __init__(self,unity_env):
 		super(UnityGymEnvironment, self).__init__()
 		self._env = unity_env
-
+		
 		# step so that the environment contain behavior spec
 		unity_env.step()
 		behavior_spec = self._env.behavior_specs
@@ -50,40 +39,38 @@ class UnityGymEnvironment(gym.Env):
 
 
 
-
 	def reset(self):
 		self._env.reset()
 
 		# retrieve the current step of the environment containing the observations
-		decision_step,_ = self._env.get_steps()
+		decision_step,_ = self._env.get_steps(self.behavior_name)
 		env_obs = decision_step.obs[0][0]
 		return env_obs
 
 
 
 	def step(self, action):
-		try :
-			# feed unn action to the env and step env
-			action = np.array(action).reshape((1, self.action_size))
-			action_tuple = ActionTuple()
-			action_tuple.add_continuous(action)
-			self._env.set_actions(action_tuple)
-			self._env.step()
+		# feed unn action to the env and step env
+		action = np.array(action).reshape((1, self.action_size))
+		action_tuple = ActionTuple()
+		action_tuple.add_continuous(action)
+		self._env.set_actions(self.behavior_name,action_tuple)
+		self._env.step()
 
-			# retrieve step type
-			decision_step, terminal_step = self._env.get_steps()
+		# retrieve step type
+		decision_step, terminal_step = self._env.get_steps(self.behavior_name)
+		done = False
+
+		if len(terminal_step) != 0:
+			done = True
+			obs = terminal_step.obs[0][0]
+			rew = terminal_step.reward[0].item()
+		else : 
 			done = False
-
-			if len(terminal_step) != 0:
-				done = True
-				obs = terminal_step.obs[0][0]
-				rew = terminal_step.reward[0].item()
-			else : 
-				done = False
-				obs = decision_step.obs[0][0]
-				rew = decision_step.reward[0].item()
-		except Exception as e:
-			print(e)
+			obs = decision_step.obs[0][0]
+			rew = decision_step.reward[0].item()
+		#except Exception as e:
+		#	print(e)
 
 		return obs,rew,done,{"step": decision_step}
 

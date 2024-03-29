@@ -15,7 +15,7 @@ from mlagents.trainers.action_info import ActionInfo
 from mlagents.trainers.settings import TrainerSettings
 from mlagents_envs.logging_util import get_logger
 
-AllStepResult = Tuple[DecisionSteps, TerminalSteps] # enlever le behavior
+AllStepResult = Dict[BehaviorName, Tuple[DecisionSteps, TerminalSteps]]
 AllGroupSpec = Dict[BehaviorName, BehaviorSpec]
 
 logger = get_logger(__name__)
@@ -24,9 +24,12 @@ logger = get_logger(__name__)
 class EnvironmentStep(NamedTuple):
     current_all_step_result: AllStepResult
     worker_id: int
-    action_info: ActionInfo
+    brain_name_to_action_info: Dict[BehaviorName, ActionInfo]
     environment_stats: EnvironmentStats
 
+    @property
+    def name_behavior_ids(self) -> Iterable[BehaviorName]:
+        return self.current_all_step_result.keys()
 
     @staticmethod
     def empty(worker_id: int) -> "EnvironmentStep":
@@ -35,16 +38,19 @@ class EnvironmentStep(NamedTuple):
 
 class EnvManager(ABC):
     def __init__(self):
-        self.policy: Policy = None
-        self.agent_manager: AgentManager = None
+        self.policies: Dict[BehaviorName, Policy] = {}
+        self.agent_managers: Dict[BehaviorName, AgentManager] = {}
         self.first_step_infos: List[EnvironmentStep] = []
 
-    def set_policy(self, policy: Policy) -> None:
-        self.policy = policy
-        self.agent_manager.policy = policy
+    def set_policy(self, brain_name: BehaviorName, policy: Policy) -> None:
+        self.policies[brain_name] = policy
+        if brain_name in self.agent_managers:
+            self.agent_managers[brain_name].policy = policy
 
-    def set_agent_manager(self, manager: AgentManager) -> None:
-        self.agent_manager = manager
+    def set_agent_manager(
+        self, brain_name: BehaviorName, manager: AgentManager
+    ) -> None:
+        self.agent_managers[brain_name] = manager
 
     @abstractmethod
     def _step(self) -> List[EnvironmentStep]:
@@ -55,16 +61,36 @@ class EnvManager(ABC):
         pass
 
     def reset(self, config: Dict = None) -> int:
-        if self.agent_manager is not None : 
-            self.agent_manager.end_episode()
+        for manager in self.agent_managers.values():
+            manager.end_episode()
         # Save the first step infos, after the reset.
         # They will be processed on the first advance().
-        self.first_step_infos = self._reset_env()
+        self.first_step_infos = self._reset_env(config)
         return len(self.first_step_infos)
+
+    @abstractmethod
+    def set_env_parameters(self, config: Dict = None) -> None:
+        """
+        Sends environment parameter settings to C# via the
+        EnvironmentParametersSideChannel.
+        :param config: Dict of environment parameter keys and values
+        """
+        pass
+
+    def on_training_started(
+        self, behavior_name: str, trainer_settings: TrainerSettings
+    ) -> None:
+        """
+        Handle traing starting for a new behavior type. Generally nothing is necessary here.
+        :param behavior_name:
+        :param trainer_settings:
+        :return:
+        """
+        pass
 
     @property
     @abstractmethod
-    def training_behaviors(self) -> BehaviorSpec:
+    def training_behaviors(self) -> Dict[BehaviorName, BehaviorSpec]:
         pass
 
     @abstractmethod
@@ -83,18 +109,17 @@ class EnvManager(ABC):
         if self.first_step_infos:
             self._process_step_infos(self.first_step_infos)
             self.first_step_infos = []
-
         # Get new policies if found. Always get the latest policy.
-        _policy = None
-        try:
-            # We make sure to empty the policy queue before continuing to produce steps.
-            # This halts the trainers until the policy queue is empty.
-            while True:
-                _policy = self.agent_manager.policy_queue.get_nowait()
-        except AgentManagerQueue.Empty:
-            if _policy is not None:
-                self.set_policy(_policy)
-
+        for brain_name in self.agent_managers.keys():
+            _policy = None
+            try:
+                # We make sure to empty the policy queue before continuing to produce steps.
+                # This halts the trainers until the policy queue is empty.
+                while True:
+                    _policy = self.agent_managers[brain_name].policy_queue.get_nowait()
+            except AgentManagerQueue.Empty:
+                if _policy is not None:
+                    self.set_policy(brain_name, _policy)
         # Step the environments
         new_step_infos = self._step()
         return new_step_infos
@@ -105,14 +130,28 @@ class EnvManager(ABC):
         return num_step_infos
 
     def _process_step_infos(self, step_infos: List[EnvironmentStep]) -> int:
-        for step_info in step_infos: 
-            decision_steps, terminal_steps = step_info.current_all_step_result
-            self.agent_manager.add_experiences(
-                decision_steps,
-                terminal_steps,
-                step_info.worker_id,
-                step_info.action_info if step_info.action_info else ActionInfo.empty(),
-            )
+        for step_info in step_infos:
+            for name_behavior_id in step_info.name_behavior_ids:
+                if name_behavior_id not in self.agent_managers:
+                    logger.warning(
+                        "Agent manager was not created for behavior id {}.".format(
+                            name_behavior_id
+                        )
+                    )
+                    continue
+                decision_steps, terminal_steps = step_info.current_all_step_result[
+                    name_behavior_id
+                ]
+                self.agent_managers[name_behavior_id].add_experiences(
+                    decision_steps,
+                    terminal_steps,
+                    step_info.worker_id,
+                    step_info.brain_name_to_action_info.get(
+                        name_behavior_id, ActionInfo.empty()
+                    ),
+                )
 
-            self.agent_manager.record_environment_stats(step_info.environment_stats, step_info.worker_id)
+                self.agent_managers[name_behavior_id].record_environment_stats(
+                    step_info.environment_stats, step_info.worker_id
+                )
         return len(step_infos)

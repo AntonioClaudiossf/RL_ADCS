@@ -5,8 +5,6 @@ Summary: Unity Machine Learning Agents Interface
 Home-page: https://github.com/Unity-Technologies/ml-agents
 Author: Unity Technologies
 Author-email: ML-Agents@unity3d.com
-License: UNKNOWN
-Platform: UNKNOWN
 Classifier: Intended Audience :: Developers
 Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
 Classifier: License :: OSI Approved :: Apache Software License
@@ -14,6 +12,3 @@ Classifier: Programming Language :: Python :: 3.6
 Classifier: Programming Language :: Python :: 3.7
 Classifier: Programming Language :: Python :: 3.8
 Requires-Python: >=3.6.1
-
-UNKNOWN
-

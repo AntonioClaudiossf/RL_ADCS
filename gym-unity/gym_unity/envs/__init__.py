@@ -99,7 +99,7 @@ class UnityToGymWrapper(gym.Env):
 
         # Check for number of agents in scene.
         self._env.reset()
-        decision_steps, _ = self._env.get_steps()
+        decision_steps, _ = self._env.get_steps(self.name)
         self._check_agents(len(decision_steps))
         self._previous_decision_step = decision_steps
 
@@ -158,7 +158,7 @@ class UnityToGymWrapper(gym.Env):
         space.
         """
         self._env.reset()
-        decision_step, _ = self._env.get_steps()
+        decision_step, _ = self._env.get_steps(self.name)
         n_agents = len(decision_step)
         self._check_agents(n_agents)
         self.game_over = False
@@ -196,10 +196,10 @@ class UnityToGymWrapper(gym.Env):
             action_tuple.add_continuous(action)
         else:
             action_tuple.add_discrete(action)
-        self._env.set_actions(action_tuple)
+        self._env.set_actions(self.name, action_tuple)
 
         self._env.step()
-        decision_step, terminal_step = self._env.get_steps()
+        decision_step, terminal_step = self._env.get_steps(self.name)
         self._check_agents(max(len(decision_step), len(terminal_step)))
         if len(terminal_step) != 0:
             # The agent is done

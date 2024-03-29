@@ -11,6 +11,7 @@ from typing import Callable, Optional, List
 import mlagents.trainers
 import mlagents_envs
 from mlagents.trainers.trainer_controller import TrainerController
+from mlagents.trainers.environment_parameter_manager import EnvironmentParameterManager
 from mlagents.trainers.trainer import TrainerFactory
 from mlagents.trainers.directory_utils import (
     validate_existing_directories,
@@ -38,6 +39,14 @@ logger = logging_util.get_logger(__name__)
 TRAINING_STATUS_FILE_NAME = "training_status.json"
 
 
+def get_version_string() -> str:
+    return f""" Version information:
+  ml-agents: {mlagents.trainers.__version__},
+  ml-agents-envs: {mlagents_envs.__version__},
+  Communicator API: {UnityEnvironment.API_VERSION},
+  PyTorch: {torch_utils.torch.__version__}"""
+
+
 def parse_command_line(argv: Optional[List[str]] = None) -> RunOptions:
     args = parser.parse_args(argv)
     return RunOptions.from_argparse(args)
@@ -51,7 +60,6 @@ def run_training(run_seed: int, options: RunOptions, num_areas: int) -> None:
     :param options: parsed command line arguments
     """
     with hierarchical_timer("run_training.setup"):
-
         torch_utils.set_torch_config(options.torch_settings)
         checkpoint_settings = options.checkpoint_settings
         env_settings = options.env_settings
@@ -84,7 +92,6 @@ def run_training(run_seed: int, options: RunOptions, num_areas: int) -> None:
 
         if env_settings.env_path is None:
             port = None
-
         env_factory = create_environment_factory(
             env_settings.env_path,
             engine_settings.no_graphics,
@@ -96,21 +103,26 @@ def run_training(run_seed: int, options: RunOptions, num_areas: int) -> None:
         )
 
         env_manager = SubprocessEnvManager(env_factory, options, env_settings.num_envs)
-        
+        env_parameter_manager = EnvironmentParameterManager(
+            options.environment_parameters, run_seed, restore=checkpoint_settings.resume
+        )
+
         trainer_factory = TrainerFactory(
             trainer_config=options.behaviors,
             output_path=checkpoint_settings.write_path,
             train_model=not checkpoint_settings.inference,
             load_model=checkpoint_settings.resume,
             seed=run_seed,
+            param_manager=env_parameter_manager,
             init_path=checkpoint_settings.maybe_init_path,
+            multi_gpu=False,
         )
-
         # Create controller and begin training.
         tc = TrainerController(
             trainer_factory,
             checkpoint_settings.write_path,
             checkpoint_settings.run_id,
+            env_parameter_manager,
             not checkpoint_settings.inference,
             run_seed,
         )
@@ -163,10 +175,10 @@ def create_environment_factory(
     env_args: Optional[List[str]],
     log_folder: str,
 ) -> Callable[[int, List[SideChannel]], BaseEnv]:
-
-    def create_unity_environment(worker_id: int, side_channels: List[SideChannel]) -> UnityEnvironment:
+    def create_unity_environment(
+        worker_id: int, side_channels: List[SideChannel]
+    ) -> UnityEnvironment:
         # Make sure that each environment gets a different seed
-
         env_seed = seed + worker_id
         return UnityEnvironment(
             file_name=env_path,
@@ -184,6 +196,28 @@ def create_environment_factory(
 
 
 def run_cli(options: RunOptions) -> None:
+    try:
+        print(
+            """
+            ┐  ╖
+        ╓╖╬│╡  ││╬╖╖
+    ╓╖╬│││││┘  ╬│││││╬╖
+ ╖╬│││││╬╜        ╙╬│││││╖╖                               ╗╗╗
+ ╬╬╬╬╖││╦╖        ╖╬││╗╣╣╣╬      ╟╣╣╬    ╟╣╣╣             ╜╜╜  ╟╣╣
+ ╬╬╬╬╬╬╬╬╖│╬╖╖╓╬╪│╓╣╣╣╣╣╣╣╬      ╟╣╣╬    ╟╣╣╣ ╒╣╣╖╗╣╣╣╗   ╣╣╣ ╣╣╣╣╣╣ ╟╣╣╖   ╣╣╣
+ ╬╬╬╬┐  ╙╬╬╬╬│╓╣╣╣╝╜  ╫╣╣╣╬      ╟╣╣╬    ╟╣╣╣ ╟╣╣╣╙ ╙╣╣╣  ╣╣╣ ╙╟╣╣╜╙  ╫╣╣  ╟╣╣
+ ╬╬╬╬┐     ╙╬╬╣╣      ╫╣╣╣╬      ╟╣╣╬    ╟╣╣╣ ╟╣╣╬   ╣╣╣  ╣╣╣  ╟╣╣     ╣╣╣┌╣╣╜
+ ╬╬╬╜       ╬╬╣╣      ╙╝╣╣╬      ╙╣╣╣╗╖╓╗╣╣╣╜ ╟╣╣╬   ╣╣╣  ╣╣╣  ╟╣╣╦╓    ╣╣╣╣╣
+ ╙   ╓╦╖    ╬╬╣╣   ╓╗╗╖            ╙╝╣╣╣╣╝╜   ╘╝╝╜   ╝╝╝  ╝╝╝   ╙╣╣╣    ╟╣╣╣
+   ╩╬╬╬╬╬╬╦╦╬╬╣╣╗╣╣╣╣╣╣╣╝                                             ╫╣╣╣╣
+      ╙╬╬╬╬╬╬╬╣╣╣╣╣╣╝╜
+          ╙╬╬╬╣╣╣╜
+             ╙
+        """
+        )
+    except Exception:
+        print("\n\n\tUnity Technologies\n")
+    print(get_version_string())
 
     if options.debug:
         log_level = logging_util.DEBUG

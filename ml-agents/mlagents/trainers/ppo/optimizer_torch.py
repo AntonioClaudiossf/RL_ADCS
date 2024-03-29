@@ -7,10 +7,10 @@ from mlagents_envs.timers import timed
 from mlagents.trainers.policy.torch_policy import TorchPolicy
 from mlagents.trainers.optimizer.torch_optimizer import TorchOptimizer
 from mlagents.trainers.settings import TrainerSettings, PPOSettings
-from mlagents.trainers.torch_modules.networks import ValueNetwork
-from mlagents.trainers.torch_modules.agent_action import AgentAction
-from mlagents.trainers.torch_modules.action_log_probs import ActionLogProbs
-from mlagents.trainers.torch_modules.utils import ModelUtils
+from mlagents.trainers.torch.networks import ValueNetwork
+from mlagents.trainers.torch.agent_action import AgentAction
+from mlagents.trainers.torch.action_log_probs import ActionLogProbs
+from mlagents.trainers.torch.utils import ModelUtils
 from mlagents.trainers.trajectory import ObsUtil
 
 
@@ -29,18 +29,15 @@ class TorchPPOOptimizer(TorchOptimizer):
         reward_signal_configs = trainer_settings.reward_signals
         reward_signal_names = [key.value for key, _ in reward_signal_configs.items()]
 
-
-        self._critic = ValueNetwork(
-            reward_signal_names,
-            policy.behavior_spec.observation_specs,
-            network_settings=trainer_settings.network_settings,
-            transfer_settings = trainer_settings.transfer_settings
-        )
-        print()
-        print("=================== CRITIC NETWORK ====================")
-        print(self._critic)
-        print()
-        self._critic.to(default_device())
+        if policy.shared_critic:
+            self._critic = policy.actor
+        else:
+            self._critic = ValueNetwork(
+                reward_signal_names,
+                policy.behavior_spec.observation_specs,
+                network_settings=trainer_settings.network_settings,
+            )
+            self._critic.to(default_device())
 
         params = list(self.policy.actor.parameters()) + list(self._critic.parameters())
         self.hyperparameters: PPOSettings = cast(
@@ -106,26 +103,62 @@ class TorchPPOOptimizer(TorchOptimizer):
         # Convert to tensors
         current_obs = [ModelUtils.list_to_tensor(obs) for obs in current_obs]
 
+        act_masks = ModelUtils.list_to_tensor(batch[BufferKey.ACTION_MASK])
         actions = AgentAction.from_buffer(batch)
 
-        log_probs, entropy = self.policy.evaluate_actions(current_obs,actions=actions,)
-        values = self.critic.critic_pass(current_obs,)
+        memories = [
+            ModelUtils.list_to_tensor(batch[BufferKey.MEMORY][i])
+            for i in range(0, len(batch[BufferKey.MEMORY]), self.policy.sequence_length)
+        ]
+        if len(memories) > 0:
+            memories = torch.stack(memories).unsqueeze(0)
+
+        # Get value memories
+        value_memories = [
+            ModelUtils.list_to_tensor(batch[BufferKey.CRITIC_MEMORY][i])
+            for i in range(
+                0, len(batch[BufferKey.CRITIC_MEMORY]), self.policy.sequence_length
+            )
+        ]
+        if len(value_memories) > 0:
+            value_memories = torch.stack(value_memories).unsqueeze(0)
+
+        log_probs, entropy = self.policy.evaluate_actions(
+            current_obs,
+            masks=act_masks,
+            actions=actions,
+            memories=memories,
+            seq_len=self.policy.sequence_length,
+        )
+        values, _ = self.critic.critic_pass(
+            current_obs,
+            memories=value_memories,
+            sequence_length=self.policy.sequence_length,
+        )
         old_log_probs = ActionLogProbs.from_buffer(batch).flatten()
         log_probs = log_probs.flatten()
-        value_loss = ModelUtils.trust_region_value_loss(values, old_values, returns, decay_eps)
+        loss_masks = ModelUtils.list_to_tensor(batch[BufferKey.MASKS], dtype=torch.bool)
+        value_loss = ModelUtils.trust_region_value_loss(
+            values, old_values, returns, decay_eps, loss_masks
+        )
         policy_loss = ModelUtils.trust_region_policy_loss(
             ModelUtils.list_to_tensor(batch[BufferKey.ADVANTAGES]),
             log_probs,
             old_log_probs,
+            loss_masks,
             decay_eps,
         )
-        loss = policy_loss+ 0.5 * value_loss- decay_bet * entropy.mean()
-        
+        loss = (
+            policy_loss
+            + 0.5 * value_loss
+            - decay_bet * ModelUtils.masked_mean(entropy, loss_masks)
+        )
 
         # Set optimizer learning rate
         ModelUtils.update_learning_rate(self.optimizer, decay_lr)
         self.optimizer.zero_grad()
         loss.backward()
+
         self.optimizer.step()
         update_stats = {
             # NOTE: abs() is not technically correct, but matches the behavior in TensorFlow.

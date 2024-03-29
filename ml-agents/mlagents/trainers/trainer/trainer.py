@@ -21,6 +21,7 @@ class Trainer(abc.ABC):
 
     def __init__(
         self,
+        brain_name: str,
         trainer_settings: TrainerSettings,
         training: bool,
         load: bool,
@@ -35,8 +36,10 @@ class Trainer(abc.ABC):
         :param artifact_path: The directory within which to store artifacts from this trainer
         :param reward_buff_cap:
         """
+        self.brain_name = brain_name
         self.trainer_settings = trainer_settings
-        self._stats_reporter = StatsReporter("Behavior", artifact_path) # se débarasser de "behavio"
+        self._threaded = trainer_settings.threaded
+        self._stats_reporter = StatsReporter(brain_name)
         self.is_training = training
         self.load = load
         self._reward_buffer: Deque[float] = deque(maxlen=reward_buff_cap)
@@ -45,7 +48,7 @@ class Trainer(abc.ABC):
         self._step: int = 0
         self.artifact_path = artifact_path
         self.summary_freq = self.trainer_settings.summary_freq
-
+        self.policies: Dict[str, Policy] = {}
 
     @property
     def stats_reporter(self):
@@ -77,6 +80,14 @@ class Trainer(abc.ABC):
         """
         return self._step
 
+    @property
+    def threaded(self) -> bool:
+        """
+        Whether or not to run the trainer in a thread. True allows the trainer to
+        update the policy while the environment is taking steps. Set to False to
+        enforce strict on-policy updates (i.e. don't update the policy when taking steps.)
+        """
+        return self._threaded
 
     @property
     def should_still_train(self) -> bool:
@@ -113,7 +124,12 @@ class Trainer(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def create_policy(self,behavior_spec: BehaviorSpec) -> Policy:
+    def create_policy(
+        self,
+        parsed_behavior_id: BehaviorIdentifiers,
+        behavior_spec: BehaviorSpec,
+        create_graph: bool = False,
+    ) -> Policy:
         """
         Creates policy
         """
@@ -153,7 +169,9 @@ class Trainer(abc.ABC):
         """
         self.policy_queues.append(policy_queue)
 
-    def subscribe_trajectory_queue(self, trajectory_queue: AgentManagerQueue[Trajectory]) -> None:
+    def subscribe_trajectory_queue(
+        self, trajectory_queue: AgentManagerQueue[Trajectory]
+    ) -> None:
         """
         Adds a trajectory queue to the list of queues for the trainer to ingest Trajectories from.
         :param trajectory_queue: Trajectory queue to read from.

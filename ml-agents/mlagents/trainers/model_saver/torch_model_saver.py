@@ -1,7 +1,6 @@
 import os
 import shutil
 from mlagents.torch_utils import torch
-
 from typing import Dict, Union, Optional, cast, Tuple, List
 from mlagents_envs.exception import UnityPolicyException
 from mlagents_envs.logging_util import get_logger
@@ -9,8 +8,8 @@ from mlagents.trainers.model_saver.model_saver import BaseModelSaver
 from mlagents.trainers.settings import TrainerSettings, SerializationSettings
 from mlagents.trainers.policy.torch_policy import TorchPolicy
 from mlagents.trainers.optimizer.torch_optimizer import TorchOptimizer
-from mlagents.trainers.torch_modules.model_serialization import ModelSerializer
-from mlagents.torch_utils import default_device
+from mlagents.trainers.torch.model_serialization import ModelSerializer
+
 
 logger = get_logger(__name__)
 DEFAULT_CHECKPOINT_NAME = "checkpoint.pt"
@@ -21,7 +20,9 @@ class TorchModelSaver(BaseModelSaver):
     ModelSaver class for PyTorch
     """
 
-    def __init__(self, trainer_settings: TrainerSettings, model_path: str, load: bool = False):
+    def __init__(
+        self, trainer_settings: TrainerSettings, model_path: str, load: bool = False
+    ):
         super().__init__()
         self.model_path = model_path
         self.initialize_path = trainer_settings.init_path
@@ -57,13 +58,14 @@ class TorchModelSaver(BaseModelSaver):
         torch.save(state_dict, f"{checkpoint_path}.pt")
         torch.save(state_dict, os.path.join(self.model_path, DEFAULT_CHECKPOINT_NAME))
         self.export(checkpoint_path, behavior_name)
-
+        
         try : 
             torch.save(self.policy.actor.network_body._body_endoder.state_dict(),self.model_path+f"/body_endoder-{step}.pth")
             torch.save(self.policy.actor.action_model.state_dict(),self.model_path+f"/action_model-{step}.pth")
             torch.save(self.policy.actor.network_body.observation_encoder.processors[0].state_dict(),self.model_path+f"/vector_input-{step}.pth")
         except : 
             pass
+        
         return export_ckpt_path, [pytorch_ckpt_path]
 
     def export(self, output_filepath: str, behavior_name: str) -> None:
@@ -94,7 +96,6 @@ class TorchModelSaver(BaseModelSaver):
         policy: Optional[TorchPolicy] = None,
         reset_global_steps: bool = False,
     ) -> None:
-        
         saved_state_dict = torch.load(load_path)
         if policy is None:
             modules = self.modules
@@ -102,7 +103,7 @@ class TorchModelSaver(BaseModelSaver):
         else:
             modules = policy.get_modules()
         policy = cast(TorchPolicy, policy)
-        
+
         for name, mod in modules.items():
             try:
                 if isinstance(mod, torch.nn.Module):
@@ -141,7 +142,7 @@ class TorchModelSaver(BaseModelSaver):
                 )
             )
         else:
-            logger.info(f"Resuming training from step {policy.get_current_step()}.") 
+            logger.info(f"Resuming training from step {policy.get_current_step()}.")
 
     def copy_final_model(self, source_nn_path: str) -> None:
         """

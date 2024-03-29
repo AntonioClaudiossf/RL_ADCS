@@ -16,7 +16,7 @@ from mlagents_envs.timers import timed
 from mlagents.trainers.optimizer import Optimizer
 from mlagents.trainers.buffer import AgentBuffer, BufferKey
 from mlagents.trainers.trainer import Trainer
-from mlagents.trainers.torch_modules.components.reward_providers.base_reward_provider import (
+from mlagents.trainers.torch.components.reward_providers.base_reward_provider import (
     BaseRewardProvider,
 )
 from mlagents_envs.timers import hierarchical_timer
@@ -60,7 +60,6 @@ class RLTrainer(Trainer):
             self.trainer_settings, self.artifact_path, self.load
         )
         self._has_warned_group_rewards = False
-        self.brain_name = "Behavior" # a retirer par la suite
 
     def end_episode(self) -> None:
         """
@@ -111,18 +110,27 @@ class RLTrainer(Trainer):
         """
         return False
 
-    def create_policy(self,behavior_spec: BehaviorSpec) -> Policy:
-        return self.create_torch_policy(behavior_spec)
+    def create_policy(
+        self,
+        parsed_behavior_id: BehaviorIdentifiers,
+        behavior_spec: BehaviorSpec,
+        create_graph: bool = False,
+    ) -> Policy:
+        return self.create_torch_policy(parsed_behavior_id, behavior_spec)
 
     @abc.abstractmethod
-    def create_torch_policy(self, behavior_spec: BehaviorSpec) -> TorchPolicy:
+    def create_torch_policy(
+        self, parsed_behavior_id: BehaviorIdentifiers, behavior_spec: BehaviorSpec
+    ) -> TorchPolicy:
         """
         Create a Policy object that uses the PyTorch backend.
         """
         pass
 
     @staticmethod
-    def create_model_saver(trainer_settings: TrainerSettings, model_path: str, load: bool) -> BaseModelSaver:
+    def create_model_saver(
+        trainer_settings: TrainerSettings, model_path: str, load: bool
+    ) -> BaseModelSaver:
         model_saver = TorchModelSaver(  # type: ignore
             trainer_settings, model_path, load
         )
@@ -141,6 +149,11 @@ class RLTrainer(Trainer):
         """
         Checkpoints the policy associated with this trainer.
         """
+        n_policies = len(self.policies.keys())
+        if n_policies > 1:
+            logger.warning(
+                "Trainer has multiple policies, but default behavior only saves the first."
+            )
         export_path, auxillary_paths = self.model_saver.save_checkpoint(
             self.brain_name, self._step
         )
@@ -160,6 +173,15 @@ class RLTrainer(Trainer):
         """
         Saves the policy associated with this trainer.
         """
+        n_policies = len(self.policies.keys())
+        if n_policies > 1:
+            logger.warning(
+                "Trainer has multiple policies, but default behavior only saves the first."
+            )
+        elif n_policies == 0:
+            logger.warning("Trainer has no policies, not saving anything.")
+            return
+
         model_checkpoint = self._checkpoint()
         self.model_saver.copy_final_model(model_checkpoint.file_path)
         export_ext = "onnx"
@@ -176,7 +198,7 @@ class RLTrainer(Trainer):
         """
         pass
 
-    def _increment_step(self, n_steps: int) -> None:
+    def _increment_step(self, n_steps: int, name_behavior_id: str) -> None:
         """
         Increment the step count of the trainer
         :param n_steps: number of steps to increment the step count by
@@ -186,7 +208,7 @@ class RLTrainer(Trainer):
         self._next_save_step = self._get_next_interval_step(
             self.trainer_settings.checkpoint_interval
         )
-        p = self.get_policy()
+        p = self.get_policy(name_behavior_id)
         if p:
             p.increment_step(n_steps)
         self.stats_reporter.set_stat("Step", float(self.get_step))
@@ -213,7 +235,7 @@ class RLTrainer(Trainer):
         """
         self._maybe_write_summary(self.get_step + len(trajectory.steps))
         self._maybe_save_model(self.get_step + len(trajectory.steps))
-        self._increment_step(len(trajectory.steps))
+        self._increment_step(len(trajectory.steps), trajectory.behavior_id)
 
     def _maybe_write_summary(self, step_after_process: int) -> None:
         """
@@ -232,7 +254,11 @@ class RLTrainer(Trainer):
         don't update to avoid a memory leak.
         """
         if self.should_still_train:
-            seq_len =  1
+            seq_len = (
+                self.trainer_settings.network_settings.memory.sequence_length
+                if self.trainer_settings.network_settings.memory is not None
+                else 1
+            )
             agentbuffer_trajectory.resequence_and_append(
                 self.update_buffer, training_length=seq_len
             )
@@ -272,16 +298,21 @@ class RLTrainer(Trainer):
                 # We grab at most the maximum length of the queue.
                 # This ensures that even if the queue is being filled faster than it is
                 # being emptied, the trajectories in the queue are on-policy.
+                _queried = False
                 for _ in range(traj_queue.qsize()):
+                    _queried = True
                     try:
                         t = traj_queue.get_nowait()
                         self._process_trajectory(t)
                     except AgentManagerQueue.Empty:
                         break
+                if self.threaded and not _queried:
+                    # Yield thread to avoid busy-waiting
+                    time.sleep(0.0001)
         if self.should_still_train:
             if self._is_ready_update():
                 with hierarchical_timer("_update_policy"):
                     if self._update_policy():
                         for q in self.policy_queues:
                             # Get policies that correspond to the policy queue in question
-                            q.put(self.get_policy())
+                            q.put(self.get_policy(q.behavior_id))

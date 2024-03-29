@@ -4,4 +4,3 @@ mlagents-run-experiment = mlagents.trainers.run_experiment:main
 
 [mlagents.stats_writer]
 default = mlagents.plugins.stats_writer:get_default_stats_writers
-

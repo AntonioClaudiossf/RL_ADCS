@@ -409,7 +409,9 @@ class ActionSpec(NamedTuple):
             )
         return ActionTuple(continuous=_continuous, discrete=_discrete)
 
-    def _validate_action(self, actions: ActionTuple, n_agents: int, name: str) -> ActionTuple:
+    def _validate_action(
+        self, actions: ActionTuple, n_agents: int, name: str
+    ) -> ActionTuple:
         """
         Validates that action has the correct action dim
         for the correct number of agents and ensures the type.
@@ -487,11 +489,6 @@ class ObservationType(Enum):
     GOAL_SIGNAL = 1
     """
     Observation contains goal information for current task.
-    """
-
-    LATENT = 2 
-    """
-    Latent observation provided by th input base
     """
 
 
@@ -587,7 +584,9 @@ class BaseEnv(ABC):
         """
 
     @abstractmethod
-    def set_action_for_agent(self, behavior_name: BehaviorName, agent_id: AgentId, action: ActionTuple) -> None:
+    def set_action_for_agent(
+        self, behavior_name: BehaviorName, agent_id: AgentId, action: ActionTuple
+    ) -> None:
         """
         Sets the action for one of the agents in the simulation for the next
         step.
@@ -600,7 +599,9 @@ class BaseEnv(ABC):
         """
 
     @abstractmethod
-    def get_steps(self, behavior_name: BehaviorName) -> Tuple[DecisionSteps, TerminalSteps]:
+    def get_steps(
+        self, behavior_name: BehaviorName
+    ) -> Tuple[DecisionSteps, TerminalSteps]:
         """
         Retrieves the steps of the agents that requested a step in the
         simulation.

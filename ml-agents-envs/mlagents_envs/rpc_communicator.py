@@ -132,7 +132,9 @@ class RpcCommunicator(Communicator):
         self.unity_to_external.parent_conn.recv()
         return aca_param
 
-    def exchange(self, inputs: UnityInputProto, poll_callback: Optional[PollCallback] = None) -> Optional[UnityOutputProto]:
+    def exchange(
+        self, inputs: UnityInputProto, poll_callback: Optional[PollCallback] = None
+    ) -> Optional[UnityOutputProto]:
         message = UnityMessageProto()
         message.header.status = 200
         message.unity_input.CopyFrom(inputs)

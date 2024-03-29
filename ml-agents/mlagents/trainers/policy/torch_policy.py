@@ -10,14 +10,13 @@ from mlagents_envs.base_env import DecisionSteps, BehaviorSpec
 from mlagents_envs.timers import timed
 
 from mlagents.trainers.settings import TrainerSettings
-from mlagents.trainers.torch_modules.networks import SimpleActor, GlobalSteps
+from mlagents.trainers.torch.networks import SimpleActor, SharedActorCritic, GlobalSteps
 
-from mlagents.trainers.torch_modules.utils import ModelUtils
+from mlagents.trainers.torch.utils import ModelUtils
 from mlagents.trainers.buffer import AgentBuffer
-from mlagents.trainers.torch_modules.agent_action import AgentAction
-from mlagents.trainers.torch_modules.action_log_probs import ActionLogProbs
+from mlagents.trainers.torch.agent_action import AgentAction
+from mlagents.trainers.torch.action_log_probs import ActionLogProbs
 
-from mlagents_envs.base_env import ActionTuple
 EPSILON = 1e-7  # Small value to avoid divide by zero
 
 
@@ -27,7 +26,7 @@ class TorchPolicy(Policy):
         seed: int,
         behavior_spec: BehaviorSpec,
         trainer_settings: TrainerSettings,
-        tanh_squash: bool = False,              # check importance dans la convergence
+        tanh_squash: bool = False,
         separate_critic: bool = True,
         condition_sigma_on_obs: bool = True,
     ):
@@ -54,38 +53,56 @@ class TorchPolicy(Policy):
             "Losses/Value Loss": "value_loss",
             "Losses/Policy Loss": "policy_loss",
         }
-        self.transfer_settings = trainer_settings.transfer_settings
+        if separate_critic:
+            self.actor = SimpleActor(
+                observation_specs=self.behavior_spec.observation_specs,
+                network_settings=trainer_settings.network_settings,
+                action_spec=behavior_spec.action_spec,
+                conditional_sigma=self.condition_sigma_on_obs,
+                tanh_squash=tanh_squash,
+            )
+            self.shared_critic = False
+        else:
+            reward_signal_configs = trainer_settings.reward_signals
+            reward_signal_names = [
+                key.value for key, _ in reward_signal_configs.items()
+            ]
+            self.actor = SharedActorCritic(
+                observation_specs=self.behavior_spec.observation_specs,
+                network_settings=trainer_settings.network_settings,
+                action_spec=behavior_spec.action_spec,
+                stream_names=reward_signal_names,
+                conditional_sigma=self.condition_sigma_on_obs,
+                tanh_squash=tanh_squash,
+            )
+            self.shared_critic = True
 
-        action_dim = behavior_spec.action_spec.continuous_size 
-
-        # extra env action (i.e vacuum sticking for the pick and place task)
-        # i.e total action size (action dim) - joints velocity vector size (state_size//2)
-        self.extra_env_action_size = action_dim - self.transfer_settings.state_dim//2
-
-        # unn action size is latent dim + extra_env_action_size (i.e 1 for stickness of gripper)
-        if self.transfer_settings.use_bases :
-            agent_action_size = self.transfer_settings.latent_dim + self.extra_env_action_size
-        else :
-            agent_action_size = action_dim
-
-        self.actor = SimpleActor(
-            transfer_settings = trainer_settings.transfer_settings,
-            observation_specs=self.behavior_spec.observation_specs,
-            network_settings=trainer_settings.network_settings,
-            action_size=agent_action_size,
-            conditional_sigma=self.condition_sigma_on_obs,
-            tanh_squash=tanh_squash,
-        )
+        # Save the m_size needed for export
+        self._export_m_size = self.m_size
+        # m_size needed for training is determined by network, not trainer settings
+        self.m_size = self.actor.memory_size
 
         self.actor.to(default_device())
         self._clip_action = not tanh_squash
-        
 
-        print()
-        print("=================== ACTOR NETWORK ====================")
-        print(self.actor)
-        print()
+    @property
+    def export_memory_size(self) -> int:
+        """
+        Returns the memory size of the exported ONNX policy. This only includes the memory
+        of the Actor and not any auxillary networks.
+        """
+        return self._export_m_size
 
+    def _extract_masks(self, decision_requests: DecisionSteps) -> np.ndarray:
+        mask = None
+        if self.behavior_spec.action_spec.discrete_size > 0:
+            num_discrete_flat = np.sum(self.behavior_spec.action_spec.discrete_branches)
+            mask = torch.ones([len(decision_requests), num_discrete_flat])
+            if decision_requests.action_mask is not None:
+                mask = torch.as_tensor(
+                    1 - np.concatenate(decision_requests.action_mask, axis=1)
+                )
+        return mask
 
     def update_normalization(self, buffer: AgentBuffer) -> None:
         """
@@ -98,7 +115,13 @@ class TorchPolicy(Policy):
             self.actor.update_normalization(buffer)
 
     @timed
-    def sample_actions(self,obs: List[torch.Tensor]) -> Tuple[AgentAction, ActionLogProbs, torch.Tensor]:
+    def sample_actions(
+        self,
+        obs: List[torch.Tensor],
+        masks: Optional[torch.Tensor] = None,
+        memories: Optional[torch.Tensor] = None,
+        seq_len: int = 1,
+    ) -> Tuple[AgentAction, ActionLogProbs, torch.Tensor, torch.Tensor]:
         """
         :param obs: List of observations.
         :param masks: Loss masks for RNN, else None.
@@ -106,15 +129,28 @@ class TorchPolicy(Policy):
         :param seq_len: Sequence length when using RNN.
         :return: Tuple of AgentAction, ActionLogProbs, entropies, and output memories.
         """
-        actions, log_probs, entropies = self.actor.get_action_and_stats(obs)
-        return (actions, log_probs, entropies)
+        actions, log_probs, entropies, memories = self.actor.get_action_and_stats(
+            obs, masks, memories, seq_len
+        )
+        return (actions, log_probs, entropies, memories)
 
-    def evaluate_actions(self,obs: List[torch.Tensor],actions: AgentAction,) -> Tuple[ActionLogProbs, torch.Tensor]:
-        log_probs, entropies = self.actor.get_stats(obs, actions)
+    def evaluate_actions(
+        self,
+        obs: List[torch.Tensor],
+        actions: AgentAction,
+        masks: Optional[torch.Tensor] = None,
+        memories: Optional[torch.Tensor] = None,
+        seq_len: int = 1,
+    ) -> Tuple[ActionLogProbs, torch.Tensor]:
+        log_probs, entropies = self.actor.get_stats(
+            obs, actions, masks, memories, seq_len
+        )
         return log_probs, entropies
 
     @timed
-    def evaluate(self, decision_requests: DecisionSteps, global_agent_ids: List[str]) -> Dict[str, Any]:
+    def evaluate(
+        self, decision_requests: DecisionSteps, global_agent_ids: List[str]
+    ) -> Dict[str, Any]:
         """
         Evaluates policy for the agent experiences provided.
         :param global_agent_ids:
@@ -122,42 +158,34 @@ class TorchPolicy(Policy):
         :return: Outputs from network as defined by self.inference_dict.
         """
         obs = decision_requests.obs
+        masks = self._extract_masks(decision_requests)
         tensor_obs = [torch.as_tensor(np_ob) for np_ob in obs]
-        #print(tensor_obs[0].shape)
+
+        memories = torch.as_tensor(self.retrieve_memories(global_agent_ids)).unsqueeze(
+            0
+        )
+
         run_out = {}
         with torch.no_grad():
-            action, log_probs, entropy = self.sample_actions(tensor_obs)
+            action, log_probs, entropy, memories = self.sample_actions(
+                tensor_obs, masks=masks, memories=memories
+            )
         action_tuple = action.to_action_tuple()
         run_out["action"] = action_tuple
-
-
-        if self.transfer_settings.use_bases :
-            state_dim = self.transfer_settings.state_dim
-            latent_dim = self.transfer_settings.latent_dim
-            with torch.no_grad():
-                # clamp UNN action and scale it
-                latent_action = (torch.clamp(action.continuous_tensor, -3, 3) / 3 ) * 1.25
-                env_action_tuple = ActionTuple()
-
-                # decode UNN action (joints velocity) using the output base 
-                env_action = self.actor.base_out.get_joints_velocity(latent_action[:,:latent_dim]).cpu().numpy()
-                
-                if self.extra_env_action_size > 0 :
-                    extra_env_action = latent_action[:,-self.extra_env_action_size].unsqueeze(-1).cpu().numpy()
-                    env_action_tuple.add_continuous(np.concatenate((env_action,extra_env_action),axis=1))
-                else :
-                    env_action_tuple.add_continuous(env_action)
-                run_out["env_action"] = env_action_tuple
-        else :
-            env_action_tuple = action.to_action_tuple(clip=self._clip_action)
-            run_out["env_action"] = env_action_tuple 
-
+        # This is the clipped action which is not saved to the buffer
+        # but is exclusively sent to the environment.
+        env_action_tuple = action.to_action_tuple(clip=self._clip_action)
+        run_out["env_action"] = env_action_tuple
         run_out["log_probs"] = log_probs.to_log_probs_tuple()
         run_out["entropy"] = ModelUtils.to_numpy(entropy)
         run_out["learning_rate"] = 0.0
+        if self.use_recurrent:
+            run_out["memory_out"] = ModelUtils.to_numpy(memories).squeeze(0)
         return run_out
 
-    def get_action(self, decision_requests: DecisionSteps, worker_id: int = 0) -> ActionInfo:
+    def get_action(
+        self, decision_requests: DecisionSteps, worker_id: int = 0
+    ) -> ActionInfo:
         """
         Decides actions given observations information, and takes them in environment.
         :param worker_id:
@@ -174,7 +202,8 @@ class TorchPolicy(Policy):
         ]  # For 1-D array, the iterator order is correct.
 
         run_out = self.evaluate(decision_requests, global_agent_ids)
-        self.check_nan_action(run_out.get("action"),decision_requests)
+        self.save_memories(global_agent_ids, run_out.get("memory_out"))
+        self.check_nan_action(run_out.get("action"))
         return ActionInfo(
             action=run_out.get("action"),
             env_action=run_out.get("env_action"),

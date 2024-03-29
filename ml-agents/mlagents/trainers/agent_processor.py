@@ -19,7 +19,7 @@ from mlagents.trainers.exception import UnityTrainerException
 from mlagents.trainers.trajectory import AgentStatus, Trajectory, AgentExperience
 from mlagents.trainers.policy import Policy
 from mlagents.trainers.action_info import ActionInfo, ActionInfoOutputs
-from mlagents.trainers.torch_modules.action_log_probs import LogProbsTuple
+from mlagents.trainers.torch.action_log_probs import LogProbsTuple
 from mlagents.trainers.stats import StatsReporter
 from mlagents.trainers.behavior_id_utils import (
     get_global_agent_id,
@@ -41,6 +41,7 @@ class AgentProcessor:
     def __init__(
         self,
         policy: Policy,
+        behavior_id: str,
         stats_reporter: StatsReporter,
         max_trajectory_length: int = sys.maxsize,
     ):
@@ -53,7 +54,9 @@ class AgentProcessor:
         :param max_trajectory_length: Maximum length of a trajectory before it is added to the trainer.
         :param stats_category: The category under which to write the stats. Usually, this comes from the Trainer.
         """
-        self._experience_buffers: Dict[GlobalAgentId, List[AgentExperience]] = defaultdict(list)
+        self._experience_buffers: Dict[
+            GlobalAgentId, List[AgentExperience]
+        ] = defaultdict(list)
         self._last_step_result: Dict[GlobalAgentId, Tuple[DecisionStep, int]] = {}
         # current_group_obs is used to collect the current (i.e. the most recently seen)
         # obs of all the agents in the same group, and assemble the group obs.
@@ -76,6 +79,7 @@ class AgentProcessor:
         self._stats_reporter = stats_reporter
         self._max_trajectory_length = max_trajectory_length
         self._trajectory_queues: List[AgentManagerQueue[Trajectory]] = []
+        self._behavior_id = behavior_id
 
         # Note: In the future this policy reference will be the policy of the env_manager and not the trainer.
         # We can in that case just grab the action from the policy rather than having it passed in.
@@ -217,6 +221,10 @@ class AgentProcessor:
         # This state is the consequence of a past action
         if stored_decision_step is not None and stored_take_action_outputs is not None:
             obs = stored_decision_step.obs
+            if self.policy.use_recurrent:
+                memory = self.policy.retrieve_previous_memories([global_agent_id])[0, :]
+            else:
+                memory = None
             done = terminated  # Since this is an ongoing step
             interrupted = step.interrupted if terminated else False
             # Add the outputs of the last eval
@@ -230,6 +238,7 @@ class AgentProcessor:
                 continuous=stored_action_probs.continuous[idx],
                 discrete=stored_action_probs.discrete[idx],
             )
+            action_mask = stored_decision_step.action_mask
             prev_action = self.policy.retrieve_previous_action([global_agent_id])[0, :]
 
             # Assemble teammate_obs. If none saved, then it will be an empty list.
@@ -244,8 +253,10 @@ class AgentProcessor:
                 done=done,
                 action=action_tuple,
                 action_probs=log_probs_tuple,
+                action_mask=action_mask,
                 prev_action=prev_action,
                 interrupted=interrupted,
+                memory=memory,
                 group_status=group_statuses,
                 group_reward=step.group_reward,
             )
@@ -272,6 +283,7 @@ class AgentProcessor:
                     agent_id=global_agent_id,
                     next_obs=next_obs,
                     next_group_obs=next_group_obs,
+                    behavior_id=self._behavior_id,
                 )
                 for traj_queue in self._trajectory_queues:
                     traj_queue.put(trajectory)
@@ -294,6 +306,7 @@ class AgentProcessor:
         self._safe_delete(self._episode_steps, global_id)
         self._safe_delete(self._episode_rewards, global_id)
         self.policy.remove_previous_action([global_id])
+        self.policy.remove_memories([global_id])
 
     def _safe_delete(self, my_dictionary: Dict[Any, Any], key: Any) -> None:
         """
@@ -337,13 +350,14 @@ class AgentManagerQueue(Generic[T]):
 
         pass
 
-    def __init__(self, maxlen: int = 0):
+    def __init__(self, behavior_id: str, maxlen: int = 0):
         """
         Initializes an AgentManagerQueue. Note that we can give it a behavior_id so that it can be identified
         separately from an AgentManager.
         """
         self._maxlen: int = maxlen
         self._queue: queue.Queue = queue.Queue(maxsize=maxlen)
+        self._behavior_id = behavior_id
 
     @property
     def maxlen(self):
@@ -352,6 +366,14 @@ class AgentManagerQueue(Generic[T]):
         :return: Maximum length of the queue.
         """
         return self._maxlen
+
+    @property
+    def behavior_id(self):
+        """
+        The Behavior ID of this queue.
+        :return: Behavior ID associated with the queue.
+        """
+        return self._behavior_id
 
     def qsize(self) -> int:
         """
@@ -386,18 +408,20 @@ class AgentManager(AgentProcessor):
     def __init__(
         self,
         policy: Policy,
+        behavior_id: str,
         stats_reporter: StatsReporter,
         max_trajectory_length: int = sys.maxsize,
+        threaded: bool = True,
     ):
-        super().__init__(policy, stats_reporter, max_trajectory_length)
-        trajectory_queue_len = 0
+        super().__init__(policy, behavior_id, stats_reporter, max_trajectory_length)
+        trajectory_queue_len = 20 if threaded else 0
         self.trajectory_queue: AgentManagerQueue[Trajectory] = AgentManagerQueue(
-            maxlen=trajectory_queue_len
+            self._behavior_id, maxlen=trajectory_queue_len
         )
         # NOTE: we make policy queues of infinite length to avoid lockups of the trainers.
         # In the environment manager, we make sure to empty the policy queue before continuing to produce steps.
         self.policy_queue: AgentManagerQueue[Policy] = AgentManagerQueue(
-            maxlen=0
+            self._behavior_id, maxlen=0
         )
         self.publish_trajectory_queue(self.trajectory_queue)
 

@@ -26,6 +26,8 @@ class PPOTrainer(RLTrainer):
 
     def __init__(
         self,
+        behavior_name: str,
+        reward_buff_cap: int,
         trainer_settings: TrainerSettings,
         training: bool,
         load: bool,
@@ -43,12 +45,16 @@ class PPOTrainer(RLTrainer):
         :param artifact_path: The directory within which to store artifacts from this trainer.
         """
         super().__init__(
+            behavior_name,
             trainer_settings,
             training,
             load,
             artifact_path,
+            reward_buff_cap,
         )
-        self.hyperparameters: PPOSettings = cast(PPOSettings, self.trainer_settings.hyperparameters)
+        self.hyperparameters: PPOSettings = cast(
+            PPOSettings, self.trainer_settings.hyperparameters
+        )
         self.seed = seed
         self.policy: Policy = None  # type: ignore
 
@@ -71,14 +77,22 @@ class PPOTrainer(RLTrainer):
             self.optimizer.critic.update_normalization(agent_buffer_trajectory)
 
         # Get all value estimates
-        value_estimates,value_next = self.optimizer.get_trajectory_value_estimates(
+        (
+            value_estimates,
+            value_next,
+            value_memories,
+        ) = self.optimizer.get_trajectory_value_estimates(
             agent_buffer_trajectory,
             trajectory.next_obs,
             trajectory.done_reached and not trajectory.interrupted,
         )
+        if value_memories is not None:
+            agent_buffer_trajectory[BufferKey.CRITIC_MEMORY].set(value_memories)
 
         for name, v in value_estimates.items():
-            agent_buffer_trajectory[RewardSignalUtil.value_estimates_key(name)].extend(v)
+            agent_buffer_trajectory[RewardSignalUtil.value_estimates_key(name)].extend(
+                v
+            )
             self._stats_reporter.add_stat(
                 f"Policy/{self.optimizer.reward_signals[name].name.capitalize()} Value Estimate",
                 np.mean(v),
@@ -89,8 +103,12 @@ class PPOTrainer(RLTrainer):
             agent_buffer_trajectory[BufferKey.ENVIRONMENT_REWARDS]
         )
         for name, reward_signal in self.optimizer.reward_signals.items():
-            evaluate_result = (reward_signal.evaluate(agent_buffer_trajectory) * reward_signal.strength)
-            agent_buffer_trajectory[RewardSignalUtil.rewards_key(name)].extend(evaluate_result)
+            evaluate_result = (
+                reward_signal.evaluate(agent_buffer_trajectory) * reward_signal.strength
+            )
+            agent_buffer_trajectory[RewardSignalUtil.rewards_key(name)].extend(
+                evaluate_result
+            )
             # Report the reward signals
             self.collected_rewards[name][agent_id] += np.sum(evaluate_result)
 
@@ -116,13 +134,19 @@ class PPOTrainer(RLTrainer):
             )
             local_return = local_advantage + local_value_estimates
             # This is later use as target for the different value estimates
-            agent_buffer_trajectory[RewardSignalUtil.returns_key(name)].set(local_return)
-            agent_buffer_trajectory[RewardSignalUtil.advantage_key(name)].set(local_advantage)
+            agent_buffer_trajectory[RewardSignalUtil.returns_key(name)].set(
+                local_return
+            )
+            agent_buffer_trajectory[RewardSignalUtil.advantage_key(name)].set(
+                local_advantage
+            )
             tmp_advantages.append(local_advantage)
             tmp_returns.append(local_return)
 
         # Get global advantages
-        global_advantages = list(np.mean(np.array(tmp_advantages, dtype=np.float32), axis=0))
+        global_advantages = list(
+            np.mean(np.array(tmp_advantages, dtype=np.float32), axis=0)
+        )
         global_returns = list(np.mean(np.array(tmp_returns, dtype=np.float32), axis=0))
         agent_buffer_trajectory[BufferKey.ADVANTAGES].set(global_advantages)
         agent_buffer_trajectory[BufferKey.DISCOUNTED_RETURNS].set(global_returns)
@@ -184,12 +208,19 @@ class PPOTrainer(RLTrainer):
         for stat, stat_list in batch_update_stats.items():
             self._stats_reporter.add_stat(stat, np.mean(stat_list))
 
+        if self.optimizer.bc_module:
+            update_stats = self.optimizer.bc_module.update()
+            for stat, val in update_stats.items():
+                self._stats_reporter.add_stat(stat, val)
         self._clear_update_buffer()
         return True
 
-    def create_torch_policy(self, behavior_spec: BehaviorSpec) -> TorchPolicy:
+    def create_torch_policy(
+        self, parsed_behavior_id: BehaviorIdentifiers, behavior_spec: BehaviorSpec
+    ) -> TorchPolicy:
         """
         Creates a policy with a PyTorch backend and PPO hyperparameters
+        :param parsed_behavior_id:
         :param behavior_spec: specifications for policy construction
         :return policy
         """
@@ -207,13 +238,23 @@ class PPOTrainer(RLTrainer):
             cast(TorchPolicy, self.policy), self.trainer_settings  # type: ignore
         )  # type: ignore
 
-    def add_policy(self, policy: Policy) -> None:
+    def add_policy(
+        self, parsed_behavior_id: BehaviorIdentifiers, policy: Policy
+    ) -> None:
         """
         Adds policy to trainer.
         :param parsed_behavior_id: Behavior identifiers that the policy should belong to.
         :param policy: Policy to associate with name_behavior_id.
         """
+        if self.policy:
+            logger.warning(
+                "Your environment contains multiple teams, but {} doesn't support adversarial games. Enable self-play to \
+                    train adversarial games.".format(
+                    self.__class__.__name__
+                )
+            )
         self.policy = policy
+        self.policies[parsed_behavior_id.behavior_id] = policy
 
         self.optimizer = self.create_ppo_optimizer()
         for _reward_signal in self.optimizer.reward_signals.keys():
@@ -226,7 +267,7 @@ class PPOTrainer(RLTrainer):
         # Needed to resume loads properly
         self._step = policy.get_current_step()
 
-    def get_policy(self) -> Policy:
+    def get_policy(self, name_behavior_id: str) -> Policy:
         """
         Gets policy from trainer associated with name_behavior_id
         :param name_behavior_id: full identifier of policy

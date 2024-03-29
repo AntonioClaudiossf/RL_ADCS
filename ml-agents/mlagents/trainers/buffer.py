@@ -23,11 +23,19 @@ class BufferException(UnityException):
 
 
 class BufferKey(enum.Enum):
+    ACTION_MASK = "action_mask"
     CONTINUOUS_ACTION = "continuous_action"
     NEXT_CONT_ACTION = "next_continuous_action"
     CONTINUOUS_LOG_PROBS = "continuous_log_probs"
+    DISCRETE_ACTION = "discrete_action"
+    NEXT_DISC_ACTION = "next_discrete_action"
+    DISCRETE_LOG_PROBS = "discrete_log_probs"
     DONE = "done"
     ENVIRONMENT_REWARDS = "environment_rewards"
+    MASKS = "masks"
+    MEMORY = "memory"
+    CRITIC_MEMORY = "critic_memory"
+    BASELINE_MEMORY = "poca_baseline_memory"
     PREV_ACTION = "prev_action"
 
     ADVANTAGES = "advantages"
@@ -37,7 +45,9 @@ class BufferKey(enum.Enum):
     GROUPMATE_REWARDS = "groupmate_reward"
     GROUP_REWARD = "group_reward"
     GROUP_CONTINUOUS_ACTION = "group_continuous_action"
+    GROUP_DISCRETE_ACTION = "group_discrete_aaction"
     GROUP_NEXT_CONT_ACTION = "group_next_cont_action"
+    GROUP_NEXT_DISC_ACTION = "group_next_disc_action"
 
 
 class ObservationKeyPrefix(enum.Enum):
