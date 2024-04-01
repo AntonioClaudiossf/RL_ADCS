@@ -13,6 +13,9 @@ from matplotlib import rcParams
 import argparse
 from mlagents.torch_utils import default_device
 import math
+from metrics import RMSE,SettlingTime,OverShoot
+import subprocess
+
 
 # parse command line arguments
 parser = argparse.ArgumentParser()
@@ -119,14 +122,8 @@ nn_obs_dim = 15                               #Observation = 15
 AGENT_HIDDEN_DIM = 225                        #Hidden unity = 255
 
 #Test performance on the environment
-print()
-print("-*-*-*-*-*-*-*-*-*--*-*-*-*-*-*-*-*-*-*")
-print("-*-*-*-*-* TEST PERFORMANCE -*-*-*-*-*-")
-print("-*-*-*-*-*-*-*-*-*--*-*-*-*-*-*-*-*-*-*")
-print()
-ENV_NAME = f"./envs/CENARIO_{args.scenario}.x86_64"
 
-print(f"========== TESTING ATTITUDE CONTROL {args.controller} SCENARIO {args.scenario} ==========")
+ENV_NAME = f"./envs/CENARIO_{args.scenario}.x86_64"
 
 RES_DIR_PATH = f"./results/AttitudeSatellite/AttitudeSatellite/"
 
@@ -140,7 +137,6 @@ if files_name == []:
 steps = bubbleSort([int(re.search('(?<=AttitudeSatellite-).*?(?=.pt)',step).group(0)) for step in files_name])
 
 step = steps[-1]
-print(f"-- Model step {step} --")
 
 # ======= LOAD MODEL =======
 vector_input = VectorInput(input_size = nn_obs_dim, normalize = True)
@@ -159,12 +155,26 @@ action_head.load_state_dict(torch.load(RES_DIR_PATH+f"action_model-{step}.pth", 
 # Load unity environment
 env = make_unity_env(ENV_NAME, worker_id = 30, no_graphics = False, time_scale = 1.0)
 
+os.system('clear || cls')
+
+print()
+print("-*-*-*-*-*-*-*-*-*--*-*-*-*-*-*-*-*-*-*")
+print("-*-*-*-*-* TEST PERFORMANCE -*-*-*-*-*-")
+print("-*-*-*-*-*-*-*-*-*--*-*-*-*-*-*-*-*-*-*")
+print()
+
+print(f"========== TESTING ATTITUDE CONTROL {args.controller} SCENARIO {args.scenario} ==========")
+
+if args.controller == 'RL':
+    print(f"-- Model step {step} --")
+
 # Test for num_test_episode
 step_perf, step_std,step_obs,step_actions,step_euler_angles = test_agent_rl(num_test_episode)
 
 #Close the environment
 env.close()
-'''' for ate aqui'''
+
+
 
 #Data to plot figure
 obs_quaternion = step_obs[:,:4]
@@ -177,11 +187,15 @@ x_perfs = np.arange(0,len(step_obs)*0.1,0.1)
 roll_mse = np.mean(np.square(np.zeros(400) - step_euler_angles[:,0]))
 pich_mse = np.mean(np.square(np.zeros(400) - step_euler_angles[:,1]))
 yaw__mse = np.mean(np.square(np.zeros(400) - step_euler_angles[:,2]))
-MSE = [roll_mse,pich_mse,yaw__mse]
+rmse = RMSE(step_euler_angles)
+sett_time = SettlingTime(step_euler_angles)
+overshoot = OverShoot(step_euler_angles)
 
 print()
 print("-*-*-*-*-*-*-*-*-*--*-*-*-*-*-*-*-*-*-*")
-print(MSE)
+print(f"RMSE: roll = {round(rmse[0],2)}, picth = {round(rmse[1],2)}, yaw = {round(rmse[2],2)},")
+print(f"Set.Time: roll = {round(sett_time[0],2)}s, picth = {round(sett_time[1],2)}s, yaw = {round(sett_time[2],2)}s,")
+print(f"Overshoot: roll = {round(overshoot[0],2)}%, picth = {round(overshoot[1],2)}%, yaw = {round(overshoot[2],2)}%,")
 print("-*-*-*-*-*-*-*-*-*--*-*-*-*-*-*-*-*-*-*")
 print()
 
