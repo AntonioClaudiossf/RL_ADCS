@@ -9,6 +9,7 @@ from mlagents_envs.environment import UnityEnvironment
 
 
 def make_unity_env(env_path,worker_id,no_graphics = True,time_scale = 20.0):
+	
 	channel = EngineConfigurationChannel()
 	channel.set_configuration_parameters(time_scale = time_scale, width = 600, height = 600)
 	EVAL_MODE = "false"

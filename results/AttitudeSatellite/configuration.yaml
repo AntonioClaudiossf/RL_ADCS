@@ -43,7 +43,7 @@ behaviors:
     self_play: null
     behavioral_cloning: null
 env_settings:
-  env_path: envs/RL_TRAINING
+  env_path: envs/TRAINING_RL
   env_args: null
   base_port: 5005
   num_envs: 16
@@ -62,7 +62,7 @@ engine_settings:
   no_graphics: true
 environment_parameters: null
 checkpoint_settings:
-  run_id: AttitudeSatellite13
+  run_id: AttitudeSatellite
   initialize_from: null
   load_model: false
   resume: false

@@ -150,7 +150,7 @@
         "timer_format_version": "0.1.0",
         "start_time_seconds": "1711656505",
         "python_version": "3.8.18 (default, Aug 25 2023, 13:20:30) \n[GCC 11.4.0]",
-        "command_line_arguments": "/home/antonio/Documents/python_envs/rl_satellite/bin/mlagents-learn config/AttitudeSatellite.yaml --run-id=AttitudeSatellite13 --env=envs/RL_TRAINING --num-envs=16 --force --no-graphics",
+        "command_line_arguments": "/home/antonio/Documents/python_envs/rl_satellite/bin/mlagents-learn config/AttitudeSatellite.yaml --run-id=AttitudeSatellite --env=envs/TRAINING_RL --num-envs=16 --force --no-graphics",
         "mlagents_version": "0.28.0",
         "mlagents_envs_version": "0.28.0",
         "communication_protocol_version": "1.5.0",
