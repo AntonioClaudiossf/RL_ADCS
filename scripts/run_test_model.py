@@ -206,7 +206,6 @@ plt.grid()
 #plt.savefig(path_pdfs+f"Euler_Ang_Cenario_{args.scenario}_{args.controller}.pdf", format='pdf', bbox_inches='tight')
 plt.clf()
 
-
 #Plot and save angular velocity
 rcParams['figure.figsize'] = 7, 4
 colors_wc = ['r','g','b']
