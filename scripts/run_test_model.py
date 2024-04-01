@@ -202,8 +202,8 @@ plt.title("Angulos de Euler do satélite")
 #plt.ylim([-0.45,0.45])
 plt.legend(loc = "upper right")
 plt.grid()
-plt.savefig(path_images+f"Euler_Ang_Cenario_{args.scenario}_{args.controller}.png", bbox_inches='tight', dpi=200)
-plt.savefig(path_pdfs+f"Euler_Ang_Cenario_{args.scenario}_{args.controller}.pdf", format='pdf', bbox_inches='tight')
+#plt.savefig(path_images+f"Euler_Ang_Cenario_{args.scenario}_{args.controller}.png", bbox_inches='tight', dpi=200)
+#plt.savefig(path_pdfs+f"Euler_Ang_Cenario_{args.scenario}_{args.controller}.pdf", format='pdf', bbox_inches='tight')
 plt.clf()
 
 
