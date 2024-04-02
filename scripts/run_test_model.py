@@ -210,9 +210,9 @@ euler_indice = ['$\phi$','$\Theta$','$\psi$']
 for i in range(0,3):
     plt.plot(x_perfs,step_euler_angles[:,i],color = colors_wc[i], label = f"{euler_indice[i]}")
 
-plt.ylabel("Angulos $(\^cir)$")
+plt.ylabel("Ângulo $(graus)$")
 plt.xlabel("Tempo (s)")
-plt.title("Angulos de Euler do satélite")
+plt.title("Ângulos de Euler")
 #plt.ylim([-0.45,0.45])
 plt.legend(loc = "upper right")
 plt.grid()
