@@ -3,15 +3,15 @@ This repository is tracking my undergraduate thesis work in electrical engineeri
 ### Requirements :
 This project was created and tested using the following settings :
 ```
-Python 3.10.12
+Python 3.8.18
 Ubuntu 22.04.3
-python package ml-agents 1.0.0
-unity ml-agents 3.0.0
+python package ml-agents 0.28.0
+unity ml-agents 2.2.1
 ```
 
 ### Enviromment
 
-To perform the attitude control of a satelite in space we usually apply torques in their so that it is placed in the desired orientation. To apply torque are commonly used reaction wheels.
+To perform the attitude control of a satelite in space, we usually apply torques on its axes so that it is placed in the desired orientation. To apply torque are commonly used reaction wheels.
 <p align="center">
   <img src="/results/images/Screenshot from 2023-11-19 21-49-45.png" width=40% />
 </p>
