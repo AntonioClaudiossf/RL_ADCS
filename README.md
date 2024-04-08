@@ -41,8 +41,11 @@ The PPO method was used for agent training, the result of the mean cumulative re
 
 #### Test Episode
 Below can be observed the pointing peformance of the satellite being controlled by the neural network (on the right side) and the PD controller (on the left side). The continuous lines represent the desired orientation, while the dashed lines represent the orientation of the satelite.
-
-<img src="ressources/images/Cenario_1/Quaternion_Cenario_1_PD.png" width="40%"/> <img src="ressources/images/Cenario_1/Quaternion_Cenario_1_RL.png" width="40%"/> 
+<p align="center">
+  <img src="ressources/images/Cenario_1/Quaternion_Cenario_1_PD.png" width="40%"/> <img src="ressources/images/Cenario_1/Quaternion_Cenario_1_RL.png" width="40%"/> 
+</p>
+<p align="center">
+</p>
 
 ### https://github.com/AntonioClaudiossf/RL_ADCS/results/videos/
 
