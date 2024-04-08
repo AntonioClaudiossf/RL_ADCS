@@ -26,26 +26,29 @@ It was considered a simplified assembly with 3 reaction wheels aligned to the ma
 
 ### Agent
 
-To perform the training was used as input information the torque value that applied to the satelite (size 3), the desired quaternion (size 4), the current quaternion (size 4) of the satelite and the angular velocity (size 3) of the satelite in the three axes.
+To perform the training was used as input information the quaternion of the current attitude of the satellite (size 4), the quaternion of the desired attitude (size 4), the quaternion of the attitude error (size 4) and the angular speed (size 3) of the satelite in the three axes.
 
-As a result in the output layer of the neural network we have a vector (size 3) with values that are multiplied by a constate to convert to torque.
+As a result in the output layer of the neural network we have a vector (size 3) with values that are multiplied by a constant to convert into torque.
 
 ### Results :
 #### Training
-The ppo method was used for agent training, the result of the mean cumulative reward during training can be observed below:
+The PPO method was used for agent training, the result of the mean cumulative reward during training can be observed below:
 <p align="center">
-  <img src="/results/images/recompensa_vs_step_teste02.png" width=40% />
+  <img src="/ressources/result_train_reward.png" width=40% />
 </p>
 <p align="center">
 </p>
 
 #### Test Episode
 Below can be observed the peformance of satellite pointing being controlled by the neural network. The dashed lines represent the desired orientation, while the continuous lines represent the orientation of the satelite.
+
+![alt-text-1](ressources/images/Cenario_1/Euler_Ang_Cenario_1_PD.png "title-1") ![alt-text-2](ressources/images/Cenario_1/Euler_Ang_Cenario_1_RL.png "title-2")
+
 <p align="center">
   <img src="/results/images/quaternion_values_teste01.png" width=70% />
 </p>
 <p align="center">
 </p>
 
-https://github.com/AntonioClaudiossf/RL_ADCS/results/videos/62f1603d-a2be-41f6-ab12-f5731e188956
+### https://github.com/AntonioClaudiossf/RL_ADCS/results/videos/
 
