@@ -47,5 +47,12 @@ Below can be observed the pointing peformance of the satellite being controlled 
 <p align="center">
 </p>
 
+The test videos are just below.
+
+<p align="center">
+  <img src="ressources/images/Cenario_1/Quaternion_Cenario_1_PD.png" width="40%"/> <img src="ressources/images/Cenario_1/Quaternion_Cenario_1_RL.png" width="40%"/> 
+</p>
+<p align="center">
+</p>
 ### https://github.com/AntonioClaudiossf/RL_ADCS/results/videos/
 

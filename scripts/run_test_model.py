@@ -77,17 +77,17 @@ def bubbleSort(arr):
             return
     return arr
 
-def PD(q_des, q_obs, Wc):
+def PD(q_des,q_obs,Wc):
     Kp = 0.02
     Kd = 0.01
     Tcx= 0
     Tcy= 0
     Tcz= 0
-    q_des = -1*np.array(q_des)
-    prod_w = q_des[3] * q_obs[3] - q_des[0] * q_obs[0] - q_des[1] * q_obs[1] - q_des[2] * q_obs[2]
-    prod_x = q_des[3] * q_obs[0] + q_des[0] * q_obs[3] + q_des[1] * q_obs[2] - q_des[2] * q_obs[1]
-    prod_y = q_des[3] * q_obs[1] + q_des[1] * q_obs[3] + q_des[2] * q_obs[0] - q_des[0] * q_obs[2]
-    prod_z = q_des[3] * q_obs[2] + q_des[2] * q_obs[3] + q_des[0] * q_obs[1] - q_des[1] * q_obs[0]
+    q_obs = -1*np.array(q_obs)
+    prod_w = q_obs[3] * q_des[3] - q_obs[0] * q_des[0] - q_obs[1] * q_des[1] - q_obs[2] * q_des[2]
+    prod_x = q_obs[3] * q_des[0] + q_obs[0] * q_des[3] + q_obs[1] * q_des[2] - q_obs[2] * q_des[1]
+    prod_y = q_obs[3] * q_des[1] - q_obs[0] * q_des[2] + q_obs[1] * q_des[1] + q_obs[2] * q_des[0]
+    prod_z = q_obs[3] * q_des[2] + q_obs[0] * q_des[1] - q_obs[1] * q_des[0] + q_obs[2] * q_des[3]
 
     q_error = [prod_x,prod_y,prod_z,prod_w]
 
@@ -97,22 +97,23 @@ def PD(q_des, q_obs, Wc):
     return np.clip(Tcx/maximum_torque,-1,1),np.clip(Tcy/maximum_torque,-1,1),np.clip(Tcz/maximum_torque,-1,1)
 	
 def quat2euler(q):
+	#Sequence XYZ
     x = q[0]
     y = q[1]
     z = q[2]
     w = q[3]
     ysqr = y * y
 
-    t0 =  -2*(y*z - x*w)
-    t1 =  w*w - x*x - y*y + z*z 
-    roll = math.degrees(math.atan2(t0, t1))
+    r0 =  2*(w*z) - 2*(x*y)
+    r1 =  w*w + x*x - y*y - z*z 
+    yaw = math.degrees(math.atan2(r0, r1))
 
-    t2 = 2*(x*z + y*w)
-    picht = math.degrees(math.asin(t2))
+    r2 = 2*(x*z) + 2*(y*w)
+    picht = math.degrees(math.asin(r2))
 
-    t3 = -2*(x*y - z*w)
-    t4 = w*w + x*x - y*y - z*z 
-    yaw = math.degrees(math.atan2(t3, t4))
+    r3 = 2*(w*x) - 2*(y*z)
+    r4 = w*w - x*x - y*y + z*z 
+    roll = math.degrees(math.atan2(r3, r4))
 
     return roll, picht, yaw
 
@@ -184,17 +185,14 @@ angular_vel = step_obs[:,12:]
 Torque = step_actions
 x_perfs = np.arange(0,len(step_obs)*0.1,0.1)
 
-roll_mse = np.mean(np.square(np.zeros(400) - step_euler_angles[:,0]))
-pich_mse = np.mean(np.square(np.zeros(400) - step_euler_angles[:,1]))
-yaw__mse = np.mean(np.square(np.zeros(400) - step_euler_angles[:,2]))
 rmse = RMSE(step_euler_angles)
 sett_time = SettlingTime(step_euler_angles)
 overshoot = OverShoot(step_euler_angles)
 
 print()
 print("-*-*-*-*-*-*-*-*-*--*-*-*-*-*-*-*-*-*-*")
-print(f"RMSE: roll = {round(rmse[0],2)}, picth = {round(rmse[1],2)}, yaw = {round(rmse[2],2)},")
 print(f"Set.Time: roll = {round(sett_time[0],2)}s, picth = {round(sett_time[1],2)}s, yaw = {round(sett_time[2],2)}s,")
+print(f"RMSE: roll = {round(rmse[0],2)}, picth = {round(rmse[1],2)}, yaw = {round(rmse[2],2)},")
 print(f"Overshoot: roll = {round(overshoot[0],2)}%, picth = {round(overshoot[1],2)}%, yaw = {round(overshoot[2],2)}%,")
 print("-*-*-*-*-*-*-*-*-*--*-*-*-*-*-*-*-*-*-*")
 print()
@@ -216,6 +214,7 @@ plt.title("Ângulos de Euler")
 #plt.ylim([-0.45,0.45])
 plt.legend(loc = "upper right")
 plt.grid()
+plt.show()
 #plt.savefig(path_images+f"Euler_Ang_Cenario_{args.scenario}_{args.controller}.png", bbox_inches='tight', dpi=200)
 #plt.savefig(path_pdfs+f"Euler_Ang_Cenario_{args.scenario}_{args.controller}.pdf", format='pdf', bbox_inches='tight')
 plt.clf()
@@ -233,6 +232,7 @@ plt.title("Velocidades angulares do satélite")
 #plt.ylim([-0.45,0.45])
 plt.legend(loc = "upper right")
 plt.grid()
+plt.show()
 #plt.savefig(path_images+f"Veloc_Ang_Cenario_{args.scenario}_{args.controller}.png", bbox_inches='tight', dpi=200)
 #plt.savefig(path_pdfs+f"Veloc_Ang_Cenario_{args.scenario}_{args.controller}.pdf", format='pdf', bbox_inches='tight')
 plt.clf()
@@ -250,6 +250,7 @@ plt.title("Torque de controle")
 #plt.ylim([-2.5/1000,2.5/1000])
 plt.legend(loc = "upper right")
 plt.grid()
+plt.show()
 #plt.savefig(path_images+f"Torque_Cenario_{args.scenario}_{args.controller}.png", bbox_inches='tight', dpi=200)
 #plt.savefig(path_pdfs+f"Torque_Cenario_{args.scenario}_{args.controller}.pdf", format='pdf', bbox_inches='tight')
 
