@@ -13,13 +13,13 @@ unity ml-agents 2.2.1
 
 To perform the attitude control of a satelite in space, we usually apply torques on its axes so that it is placed in the desired orientation. To apply torque are commonly used reaction wheels.
 <p align="center">
-  <img src="/results/images/Screenshot from 2023-11-19 21-49-45.png" width=40% />
+  <img src="/ressources/trainenvironment.png" width=40% />
 </p>
 <p align="center">
 </p>
 It was considered a simplified assembly with 3 reaction wheels aligned to the main axes of the satellite, as shown in the figure below.
 <p align="center">
-  <img src="/results/images/Screenshot from 2023-11-19 21-46-34.png" width=40% />
+  <img src="/results/RW3.png" width=40% />
 </p>
 <p align="center">
 </p>
