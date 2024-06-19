@@ -23,10 +23,12 @@ parser.add_argument("-n", "--num_test_episode", type=int, default=1, help="numbe
 parser.add_argument("-f", "--freq_test_models", type=int, default=1, help="skip checkpoints every freq_test_models")
 parser.add_argument("-s", "--scenario", type=int, default=1, help="Scenario 1, 2 or 3")
 parser.add_argument("-c", "--controller", type=str, default="PD", help="Controller type PD or RL")
+parser.add_argument("-id","--run_id", type=str, default="AttitudeSatellite", help="Folder in which the training result was saved.")
 args = parser.parse_args()
 
 
 num_test_episode = args.num_test_episode
+run_id = args.run_id
 freq_test_models = args.freq_test_models
 freq_chkpt = 0.05 #1e6 steps
 linspace = freq_test_models * freq_chkpt
@@ -127,7 +129,7 @@ AGENT_HIDDEN_DIM = 225                        #Hidden unity = 255
 
 ENV_NAME = f"./envs/CENARIO_{args.scenario}.x86_64"
 
-RES_DIR_PATH = f"./results/AttitudeSatellite/AttitudeSatellite/"
+RES_DIR_PATH = f"./results/{run_id}/{run_id}/"
 
 # Retrieve every models from the checkpoint folder for tests
 checkpoint_name = f"AttitudeSatellite-*.pt"
