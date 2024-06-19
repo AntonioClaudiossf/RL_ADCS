@@ -13,7 +13,7 @@ from matplotlib import rcParams
 import argparse
 from mlagents.torch_utils import default_device
 import math
-from metrics import RMSE,SettlingTime,OverShoot
+from metrics import IAE,SettlingTime,OverShoot
 import subprocess
 
 
@@ -186,15 +186,15 @@ angular_vel = step_obs[:,12:]
 Torque = step_actions
 x_perfs = np.arange(0,len(step_obs)*0.1,0.1)
 
-rmse = RMSE(step_euler_angles)
+iae = IAE(step_euler_angles)
 sett_time = SettlingTime(step_euler_angles)
 overshoot = OverShoot(step_euler_angles)
 
 print()
 print("-*-*-*-*-*-*-*-*-*--*-*-*-*-*-*-*-*-*-*")
 print(f"Set.Time: roll = {round(sett_time[0],2)}s, picth = {round(sett_time[1],2)}s, yaw = {round(sett_time[2],2)}s,")
-print(f"RMSE: roll = {round(rmse[0],2)}, picth = {round(rmse[1],2)}, yaw = {round(rmse[2],2)},")
 print(f"Overshoot: roll = {round(overshoot[0],2)}%, picth = {round(overshoot[1],2)}%, yaw = {round(overshoot[2],2)}%,")
+print(f"IAE: roll = {round(iae[0],2)}, picth = {round(iae[1],2)}, yaw = {round(iae[2],2)},")
 print("-*-*-*-*-*-*-*-*-*--*-*-*-*-*-*-*-*-*-*")
 print()
 

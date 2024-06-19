@@ -1,12 +1,13 @@
 import numpy as np
+import math
 
-def RMSE(Euler_angles):
+def IAE(Euler_angles):
     len_steps = len(Euler_angles[:,0])
-    roll_rmse = np.sqrt(np.mean(np.square(np.zeros(len_steps) - Euler_angles[:,0])))
-    pich_rmse = np.sqrt(np.mean(np.square(np.zeros(len_steps) - Euler_angles[:,1])))
-    yaw__rmse = np.sqrt(np.mean(np.square(np.zeros(len_steps) - Euler_angles[:,2])))    
-    rmse = np.array([roll_rmse,pich_rmse,yaw__rmse])
-    return rmse
+    roll_iae = np.sum(np.absolute(np.zeros(len_steps) - (Euler_angles[:,0]*math.pi/180.0)))
+    pich_iae = np.sum(np.absolute(np.zeros(len_steps) - (Euler_angles[:,1]*math.pi/180.0)))
+    yaw__iae = np.sum(np.absolute(np.zeros(len_steps) - (Euler_angles[:,2]*math.pi/180.0)))
+    iae = np.array([roll_iae,pich_iae,yaw__iae])
+    return iae
 
 def SettlingTime(euler_angles):
     threshold = 0.02 #2%
@@ -43,7 +44,6 @@ def OverShoot(Euler_angles):
     euler_init = np.array([30,45,60])
     len_steps = len(Euler_angles[:,0])
     overshoot_r = (-np.min(Euler_angles[:,0])/(euler_init[0]))*100
-    print()
     if overshoot_r<0:
         overshoot_r = 0
     overshoot_p = (-np.min(Euler_angles[:,1])/(euler_init[1]))*100
