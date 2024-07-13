@@ -89,9 +89,7 @@ Below can be observed the pointing peformance of the satellite being controlled 
 The test videos are just below. On the left PD Control and RL Control on the right.
 
 <p align="center">
-  <img src="ressources/Cenario 2 PD.gif" width="40%"/> <img src="ressources/Cenario 2 RL.png" width="40%"/> 
+  <img src="ressources/Cenario 2 PD.gif" width="40%"/> <img src="ressources/Cenario 2 RL.gif" width="40%"/> 
 </p>
 <p align="center">
 </p>
-### https://github.com/AntonioClaudiossf/RL_ADCS/results/videos/
-
