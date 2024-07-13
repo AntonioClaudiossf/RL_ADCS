@@ -81,7 +81,7 @@ python3 scripts/run_test_model.py -s 2 -c RL -id agenterl
 
 Below can be observed the pointing peformance of the satellite being controlled by the neural network (on the right side) and the PD controller (on the left side). The continuous lines represent the desired orientation, while the dashed lines represent the orientation of the satelite.
 <p align="center">
-  <img src="ressources/images/Cenario_2/Quaternion_Cenario_1_PD.png" width="30%"/> <img src="ressources/images/Cenario_2/Quaternion_Cenario_1_RL.png" width="30%"/> 
+  <img src="ressources/images/Cenario_2/Quaternion_Cenario_2_PD.png" width="30%"/> <img src="ressources/images/Cenario_2/Quaternion_Cenario_2_RL.png" width="30%"/> 
 </p>
 <p align="center">
 </p>
