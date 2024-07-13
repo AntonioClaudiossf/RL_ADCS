@@ -178,8 +178,6 @@ step_perf, step_std,step_obs,step_actions,step_euler_angles = test_agent_rl(num_
 #Close the environment
 env.close()
 
-
-
 #Data to plot figure
 obs_quaternion = step_obs[:,:4]
 des_quaternion = step_obs[:,4:8]
@@ -204,6 +202,16 @@ print()
 path_images = f"./ressources/images/Cenario_{args.scenario}/"
 path_pdfs = f"./ressources/pdfs/Cenario_{args.scenario}/"
 
+
+#Save numpy txt to print the graphics
+np.savetxt(path_images+f"Quaternion_Obs_Cenario_{args.scenario}_{args.controller}",obs_quaternion)
+np.savetxt(path_images+f"Quaternion_Des_Cenario_{args.scenario}_{args.controller}",des_quaternion)
+np.savetxt(path_images+f"Euler_Ang_Cenario_{args.scenario}_{args.controller}",step_euler_angles)
+np.savetxt(path_images+f"Torque_Cenario_{args.scenario}_{args.controller}",Torque)
+np.savetxt(path_images+f"Veloc_Ang_Cenario_{args.scenario}_{args.controller}",angular_vel)
+
+
+
 #Plot and save Euler Angles
 rcParams['figure.figsize'] = 7, 4
 colors_wc = ['r','g','b']
@@ -218,8 +226,8 @@ plt.title("Ângulos de Euler")
 plt.legend(loc = "upper right")
 plt.grid()
 plt.show()
-#plt.savefig(path_images+f"Euler_Ang_Cenario_{args.scenario}_{args.controller}.png", bbox_inches='tight', dpi=200)
-#plt.savefig(path_pdfs+f"Euler_Ang_Cenario_{args.scenario}_{args.controller}.pdf", format='pdf', bbox_inches='tight')
+plt.savefig(path_images+f"Euler_Ang_Cenario_{args.scenario}_{args.controller}.png", bbox_inches='tight', dpi=200)
+plt.savefig(path_pdfs+f"Euler_Ang_Cenario_{args.scenario}_{args.controller}.pdf", format='pdf', bbox_inches='tight')
 plt.clf()
 
 #Plot and save angular velocity
@@ -236,8 +244,8 @@ plt.title("Velocidades angulares do satélite")
 plt.legend(loc = "upper right")
 plt.grid()
 plt.show()
-#plt.savefig(path_images+f"Veloc_Ang_Cenario_{args.scenario}_{args.controller}.png", bbox_inches='tight', dpi=200)
-#plt.savefig(path_pdfs+f"Veloc_Ang_Cenario_{args.scenario}_{args.controller}.pdf", format='pdf', bbox_inches='tight')
+plt.savefig(path_images+f"Veloc_Ang_Cenario_{args.scenario}_{args.controller}.png", bbox_inches='tight', dpi=200)
+plt.savefig(path_pdfs+f"Veloc_Ang_Cenario_{args.scenario}_{args.controller}.pdf", format='pdf', bbox_inches='tight')
 plt.clf()
 
 #Plot and save control torque
@@ -254,8 +262,8 @@ plt.title("Torque de controle")
 plt.legend(loc = "upper right")
 plt.grid()
 plt.show()
-#plt.savefig(path_images+f"Torque_Cenario_{args.scenario}_{args.controller}.png", bbox_inches='tight', dpi=200)
-#plt.savefig(path_pdfs+f"Torque_Cenario_{args.scenario}_{args.controller}.pdf", format='pdf', bbox_inches='tight')
+plt.savefig(path_images+f"Torque_Cenario_{args.scenario}_{args.controller}.png", bbox_inches='tight', dpi=200)
+plt.savefig(path_pdfs+f"Torque_Cenario_{args.scenario}_{args.controller}.pdf", format='pdf', bbox_inches='tight')
 
 #Plot and ave Quaternions
 rcParams['figure.figsize'] = 5, 7.5
@@ -270,6 +278,6 @@ for i in range(0,4):
 	axs[i].legend()
 
 fig.suptitle("Quatérnions", fontsize=18)
-#plt.savefig(path_images+f"Quaternion_Cenario_{args.scenario}_{args.controller}.png", bbox_inches='tight', dpi=200)
-#plt.savefig(path_pdfs+f"Quaternion_Cenario_{args.scenario}_{args.controller}.pdf", format='pdf', bbox_inches='tight')
+plt.savefig(path_images+f"Quaternion_Cenario_{args.scenario}_{args.controller}.png", bbox_inches='tight', dpi=200)
+plt.savefig(path_pdfs+f"Quaternion_Cenario_{args.scenario}_{args.controller}.pdf", format='pdf', bbox_inches='tight')
 plt.show()
