@@ -86,10 +86,10 @@ Below can be observed the pointing peformance of the satellite being controlled 
 <p align="center">
 </p>
 
-The test videos are just below.
+The test videos are just below. On the left PD Control and RL Control on the right.
 
 <p align="center">
-  <img src="ressources/images/Cenario_1/Quaternion_Cenario_1_PD.png" width="40%"/> <img src="ressources/images/Cenario_1/Quaternion_Cenario_1_RL.png" width="40%"/> 
+  <img src="ressources/Cenario 2 PD.gif" width="40%"/> <img src="ressources/Cenario 2 RL.png" width="40%"/> 
 </p>
 <p align="center">
 </p>
